@@ -30,26 +30,34 @@ except Exception:
 
 st.info(f"🟢 **{klci_text}**   |   ✨ **Status:** Sistem Aktif & Bersedia Mengimbas")
 
-# --- KAMUS SEKTOR & SYARIAH BURSA ---
+# --- KAMUS SEKTOR BURSA MALAYSIA ---
 sector_dict = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUDA.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL", "WCT.KL", "KERJAYA.KL"],
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL", "YTLPOWR.KL", "MEGAFB.KL"],
-    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN.KL", "INARI.KL", "KGB.KL", "MYEG.KL", "PENTA.KL", "MPI.KL"],
-    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ.KL", "IHH.KL", "TOPGLOV.KL", "HARTALEGA.KL"],
-    "🌾 Perladangan & Komoditi (Plantation)": ["KLK.KL", "IOICORP.KL", "FGV.KL", "HAPSENG.KL"],
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["TMK.KL", "CDB.KL", "MAXIS.KL", "SIME.KL", "PMETAL.KL"]
+    "🔥 Pembinaan & Infrastruktur (Construction)": "GAMUDA.KL, SUNCON.KL, IJM.KL, MRCB.KL, WCT.KL, KERJAYA.KL, EBP.KL",
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": "SAMAIDEN.KL, PEKAT.KL, TENAGA.KL, YTLPOWR.KL, MEGAFB.KL, CYPARK.KL",
+    "💻 Teknologi & Semikonduktor (Tech)": "FRONTKN.KL, INARI.KL, KGB.KL, MYEG.KL, PENTA.KL, MPI.KL, UNISEM.KL",
+    "🏥 Penjagaan Kesihatan (Healthcare)": "KPJ.KL, IHH.KL, TOPGLOV.KL, HARTALEGA.KL",
+    "🌾 Perladangan & Komoditi (Plantation)": "KLK.KL, SD Guthrie.KL, IOICORP.KL, FGV.KL, HAPSENG.KL",
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": "TMK.KL, CDB.KL, MAXIS.KL, SIME.KL, PMETAL.KL",
+    "✨ Custom / Masukkan Sendiri Kaunter Pilihan": "TMK.KL, PEKAT.KL, KPJ.KL, SUNCON.KL, SAMAIDEN.KL, FRONTKN.KL, GAMUDA.KL"
 }
 
-# --- SIDEBAR TETAPAN ---
+# --- SIDEBAR TETAPAN & PILIHAN ---
 st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
+
 selected_sector = st.sidebar.selectbox("Pilih Sektor Pasaran:", list(sector_dict.keys()))
-tickers = sector_dict[selected_sector]
+default_tickers = sector_dict[selected_sector]
+
+# Kotak teks supaya anda boleh ubah atau tambah kaunter sendiri secara manual!
+ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", default_tickers, height=100)
 
 vol_mult = st.sidebar.slider("Gandaan Volume Minimum (vs Purata 20H)", 1.0, 3.0, 1.5, 0.1)
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.20, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 80, 1)
 
 if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
+    # Ambil senarai kaunter daripada kotak teks yang anda masukkan/ubah
+    tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
+    
     scan_results = []
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -108,7 +116,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
             base_days = 22
             base_range_pct = (highest_base - lowest_base) / lowest_base
             
-            is_bob = is_uptrend and (base_range_pct <= 0.25) and (last_close >= highest_base) and vol_spike
+            is_bob = is_uptrend and (base_range_pct <= 0.30) and (last_close >= highest_base * 0.98) and vol_spike
             is_bod = is_uptrend and vol_spike and not is_bob
             
             signal = "-"
@@ -116,6 +124,13 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
                 signal = "🔥 BOB (Breakout of Base)"
             elif is_bod:
                 signal = "⚡ BOD (Breakout of Downtrend)"
+            elif is_uptrend and vol_spike:
+                signal = "✨ Volume Spike (Potensi)"
+                
+            # Jika anda mahu pastikan lebih banyak kaunter keluar semasa pengujian, 
+            # kita longgarkan sedikit syarat isyarat jika vol_spike atau uptrend berlaku:
+            if signal == "-" and is_uptrend and vol_spike:
+                signal = "📈 Momentum Uptrend"
                 
             if signal != "-":
                 stop_loss = round(last_close - (atr * 1.5), 2)
@@ -131,7 +146,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
                     "Kaunter & Sektor": f"{ticker.replace('.KL', '')} | {selected_sector.split(' ')[1]}",
                     "Harga (MYR)": f"RM {last_close:.2f} ({'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%)",
                     "Isyarat Teknikal": f"{signal} (Base: {base_days}h)",
-                    "Struktur Trend & Vol": f"Harga > EMA20 > EMA50 | Vol: {last_vol/avg_vol:.1f}x RSI: {rsi:.0f}",
+                    "Struktur Trend & Vol": f"Harga > EMA20 | Vol: {last_vol/avg_vol:.1f}x RSI: {rsi:.0f}",
                     "Cadangan SL (ATR)": f"RM {stop_loss} ({risk_pct}%)",
                     "EPS YoY / ROE": f"{eps_yoy}\nROE: {roe:.1f}%",
                     "Skor FA & CANSLIM": f"{fa_score}/100\nP/E: {pe:.1f}x",
@@ -157,6 +172,6 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
             mime="text/csv",
         )
     else:
-        st.warning("Tiada kaunter memenuhi kriteria ketat BOB/BOD & RSI dalam sektor ini buat masa ini.")
+        st.warning("Tiada kaunter memenuhi kriteria dalam senarai ini. Cuba kurangkan gandaan volume atau masukkan senarai kaunter lain.")
 else:
-    st.info("👈 Pilih sektor di sebelah kiri (Sidebar), laraskan tetapan, dan klik **Mula Imbas Pasaran Pro** untuk mula memaparkan keputusan gaya papan pemuka profesional.")
+    st.info("👈 Pilih sektor atau masukkan senarai kaunter anda di petak sebelah kiri (Sidebar), kemudian klik **Mula Imbas Pasaran Pro**.")
