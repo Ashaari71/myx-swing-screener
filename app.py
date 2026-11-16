@@ -14,8 +14,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Live Screener & Live Charts")
-st.markdown("Sistem Saringan Live Data Bursa Malaysia, Carta Interaktif, Pengurusan Risiko & Telegram")
+st.title("📈 MYX Swing Pro: Sektor Trend 5H, Live Screener & Live Charts")
+st.markdown("Sistem Saringan Sektor, Prestasi 5 Hari, Live Data Yahoo Finance, Carta Interaktif, Risiko & Telegram")
+
+# --- SENARAI SEKTOR BURSA MALAYSIA ---
+sector_benchmarks = {
+    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL", "WCT.KL"],
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL", "YTLPOWR.KL"],
+    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN.KL", "INARI.KL", "KGB.KL", "MYEG.KL", "PENTA.KL"],
+    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ.KL", "IHH.KL", "TOPGLOV.KL", "HARTALEGA.KL"],
+    "🌾 Perladangan & Komoditi (Plantation)": ["KLK.KL", "IOICORP.KL", "FGV.KL", "HAPSENG.KL"],
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["TMK.KL", "CDB.KL", "MAXIS.KL", "SIME.KL", "PMETAL.KL"],
+    "✨ Pilihan Utama / Custom": ["CITAGLB.KL", "GAMUD.KL", "SUNCON.KL", "MYEG.KL", "YTLPOWR.KL"]
+}
 
 # Dapatkan Data FBM KLCI Semasa Live
 try:
@@ -28,11 +39,43 @@ try:
 except Exception:
     klci_text = "FBM KLCI: 1,588.03 (+0.34%)"
 
-st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Sistem Saringan Aktif")
+st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Sistem Saringan & Trend Sektor Aktif")
+
+# --- ANALISIS PRESTASI SEKTOR (5 HARI) ---
+st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Terkini)")
+sector_perf = []
+
+for sec_name, t_list in sector_benchmarks.items():
+    if sec_name == "✨ Pilihan Utama / Custom":
+        continue
+    sec_returns = []
+    for t in t_list[:3]:
+        try:
+            df_sec = yf.Ticker(t).history(period="6d")
+            if len(df_sec) >= 5:
+                ret = ((df_sec['Close'].iloc[-1] - df_sec['Close'].iloc[-5]) / df_sec['Close'].iloc[-5]) * 100
+                sec_returns.append(ret)
+        except Exception:
+            pass
+    if sec_returns:
+        avg_ret = np.mean(sec_returns)
+        status_trend = "🚀 Uptrend Kuat" if avg_ret > 1.0 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
+        sector_perf.append({
+            "Sektor Pasaran": sec_name,
+            "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+            "Status Trend Sektor": status_trend
+        })
+
+if sector_perf:
+    perf_df = pd.DataFrame(sector_perf)
+    st.dataframe(perf_df, use_container_width=True, hide_index=True)
+
+st.markdown("---")
 
 # --- SIDEBAR: TETAPAN & PENAPIS ---
 st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
-default_tickers = "CITAGLB.KL, GAMUD.KL, SUNCON.KL, MYEG.KL, YTLPOWR.KL"
+selected_sector = st.sidebar.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
+default_tickers = ", ".join(sector_benchmarks[selected_sector])
 
 ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", default_tickers, height=100)
 
@@ -79,7 +122,6 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
         except Exception:
             pass
             
-        # Jika Yahoo Finance gagal atau kosong, guna data sandaran supaya carta tetap wujud
         if df.empty or len(df) < 10:
             dates = pd.date_range(end=pd.Timestamp.today(), periods=60)
             base_p = 1.05 if "CITAGLB" in ticker else (4.50 if "GAMUD" in ticker else 1.20)
@@ -124,7 +166,6 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
         result_df = pd.DataFrame(scan_results)
         st.dataframe(result_df, use_container_width=True, hide_index=True)
         
-        # Butang Telegram Alert
         if telegram_token and telegram_chat_id:
             if st.button("📲 Hantar Keputusan ke Telegram"):
                 msg_text = "🚨 *MYX LIVE SCAN ALERT* 🚨\n\nKaunter Aktif Dikesan:\n"
@@ -140,7 +181,6 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                 else:
                     st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
         
-        # --- CARTA INTERAKTIF CANDLESTICK (PLOTLY) ---
         st.markdown("---")
         st.subheader("📊 Candlestick Charts & Technical Analysis")
         
@@ -205,4 +245,4 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
     else:
         st.warning("Sila masukkan kod kaunter di ruangan sidebar.")
 else:
-    st.info("👈 Masukkan senarai kod kaunter di sidebar (contoh: CITAGLB.KL, GAMUD.KL, SUNCON.KL), kemudian klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Rujuk jadual prestasi sektor di atas, masukkan senarai kod kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
