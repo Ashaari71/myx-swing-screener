@@ -15,7 +15,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Live Screener & Official TradingView Charts")
-st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Carta TradingView Sebenar, Risiko & Telegram")
+st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Carta TradingView Dinamik, Risiko & Telegram")
 
 # --- SENARAI SEKTOR BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -131,11 +131,17 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                 pass
                 
             clean_ticker = ticker.replace('.KL', '')
+            
+            # Pengesanan teknik asas BOB/BOD untuk paparan jadual
+            tech_signal = "🔥 Trend Positif Aktif"
+            if price_change_pct > 3.0:
+                tech_signal = "⚡ BOD / BOB Momentum Breakout"
+                
             scan_results.append({
                 "Kaunter & Sektor": f"{clean_ticker} | Live Market",
                 "Harga (MYR)": round(last_close, 2),
                 "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-                "Isyarat Teknikal": "🔥 Trend Positif Aktif",
+                "Isyarat Teknikal": tech_signal,
                 "Cadangan SL (ATR)": round(last_close * 0.93, 2),
                 "Analisis": "Sokongan Kuat / Volum Stabil"
             })
@@ -165,12 +171,13 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                     else:
                         st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
             
-            # --- CARTA TRADINGVIEW MENGIKUT KAUNTER ---
+            # --- CARTA TRADINGVIEW DINAMIK MENGIKUT SENARAI KAUNTER YANG DIIMBAS ---
             st.markdown("---")
             st.subheader("📊 Live TradingView Advanced Charts (Mengikut Kaunter Imbasan)")
+            st.markdown("Setiap carta di bawah dimuat turun secara langsung untuk kaunter Bursa Malaysia pilihan anda, lengkap dengan alatan melukis (*drawing tools*).")
             
             for t_name in raw_tickers:
-                with st.expander(f"📈 Buka Carta TradingView: {t_name}"):
+                with st.expander(f"📈 Papar Carta TradingView: {t_name}"):
                     tv_html = f"""
                     <div class="tradingview-widget-container" style="height:550px;width:100%">
                       <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
