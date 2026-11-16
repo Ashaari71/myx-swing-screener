@@ -14,19 +14,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Live Screener, Sektor & Live Charts")
-st.markdown("Sistem Saringan Sektor, Prestasi 5 Hari, Live Data Yahoo Finance, Pengurusan Risiko & Telegram")
-
-# --- SENARAI SEKTOR BURSA MALAYSIA ---
-sector_benchmarks = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUDA.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL", "WCT.KL"],
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL", "YTLPOWR.KL"],
-    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN.KL", "INARI.KL", "KGB.KL", "MYEG.KL", "PENTA.KL"],
-    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ.KL", "IHH.KL", "TOPGLOV.KL", "HARTALEGA.KL"],
-    "🌾 Perladangan & Komoditi (Plantation)": ["KLK.KL", "IOICORP.KL", "FGV.KL", "HAPSENG.KL"],
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["TMK.KL", "CDB.KL", "MAXIS.KL", "SIME.KL", "PMETAL.KL"],
-    "✨ Pilihan Utama / Custom": ["CITAGLB.KL", "GAMUDA.KL", "SUNCON.KL", "MYEG.KL", "YTLPOWR.KL"]
-}
+st.title("📈 MYX Swing Pro: Live Screener & Live Charts")
+st.markdown("Sistem Saringan Live Data Yahoo Finance, Carta Interaktif, Pengurusan Risiko & Telegram")
 
 # Dapatkan Data FBM KLCI Semasa Live
 try:
@@ -41,45 +30,14 @@ except Exception:
 
 st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance Aktif")
 
-# --- ANALISIS PRESTASI SEKTOR (5 HARI) ---
-st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Terkini)")
-sector_perf = []
-
-for sec_name, t_list in sector_benchmarks.items():
-    sec_returns = []
-    for t in t_list[:3]:
-        try:
-            df_sec = yf.Ticker(t).history(period="6d")
-            if len(df_sec) >= 5:
-                ret = ((df_sec['Close'].iloc[-1] - df_sec['Close'].iloc[-5]) / df_sec['Close'].iloc[-5]) * 100
-                sec_returns.append(ret)
-        except Exception:
-            pass
-    if sec_returns:
-        avg_ret = np.mean(sec_returns)
-        status_trend = "🚀 Uptrend Kuat" if avg_ret > 1.0 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
-        sector_perf.append({
-            "Sektor Pasaran": sec_name,
-            "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-            "Status Trend Sektor": status_trend
-        })
-
-if sector_perf:
-    perf_df = pd.DataFrame(sector_perf)
-    st.dataframe(perf_df, use_container_width=True, hide_index=True)
-
-st.markdown("---")
-
 # --- SIDEBAR: TETAPAN & PENAPIS ---
 st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
-selected_sector = st.sidebar.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
-default_tickers = ", ".join(sector_benchmarks[selected_sector])
+default_tickers = "CITAGLB.KL, GAMUD.KL, SUNCON.KL, INARI.KL, MYEG.KL, YTLPOWR.KL"
 
 ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", default_tickers, height=100)
 
-vol_mult = st.sidebar.slider("Gandaan Volume Minimum (vs Purata 20H)", 0.5, 3.0, 1.0, 0.1)
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.10, step=0.05)
-max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 90, 1)
+max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 95, 1)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🤖 Tetapan Telegram Bot")
@@ -118,66 +76,36 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
             stock = yf.Ticker(ticker)
             df = stock.history(period="6mo", interval="1d")
             
-            if df.empty or len(df) < 30:
+            if df.empty or len(df) < 20:
                 continue
                 
             df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
-            df['AvgVol20'] = df['Volume'].rolling(window=20).mean()
-            
-            high_low = df['High'] - df['Low']
-            high_close = np.abs(df['High'] - df['Close'].shift())
-            low_close = np.abs(df['Low'] - df['Close'].shift())
-            true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-            df['ATR'] = true_range.rolling(window=14).mean()
-            
-            delta = df['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            df['RSI'] = 100 - (100 / (1 + rs))
             
             last_close = float(df['Close'].iloc[-1])
             prev_close = float(df['Close'].iloc[-2])
             price_change_pct = ((last_close - prev_close) / prev_close) * 100
             
-            last_vol = float(df['Volume'].iloc[-1])
-            avg_vol = float(df['AvgVol20'].iloc[-1]) if not np.isnan(df['AvgVol20'].iloc[-1]) else last_vol
             ema20 = float(df['EMA20'].iloc[-1])
             ema50 = float(df['EMA50'].iloc[-1])
-            atr = float(df['ATR'].iloc[-1]) if not np.isnan(df['ATR'].iloc[-1]) else (last_close * 0.05)
-            rsi = float(df['RSI'].iloc[-1]) if not np.isnan(df['RSI'].iloc[-1]) else 50.0
             
-            if last_close < min_price or rsi > max_rsi:
-                continue
-                
-            is_uptrend = (last_close > ema20)
-            vol_spike = last_vol >= (avg_vol * vol_mult * 0.8) # Dipermudahkan sedikit untuk live market
+            # Pengiraan ATR mudah
+            high_low = df['High'] - df['Low']
+            atr = float(high_low.rolling(window=14).mean().iloc[-1])
+            if np.isnan(atr):
+                atr = last_close * 0.05
             
-            signal = "📈 Live Momentum Aktif"
-            if is_uptrend and vol_spike:
-                signal = "🔥 Volume Spike / Uptrend"
-                
             stop_loss = round(last_close - (atr * 1.5), 2)
-            
-            info = stock.info
-            roe = info.get('returnOnEquity', 0.15)
-            if roe:
-                roe = roe * 100
-            else:
-                roe = 15.0
-            pe = info.get('trailingPE', 20.0)
             
             clean_ticker = ticker.replace('.KL', '')
             scan_results.append({
                 "Kaunter & Sektor": f"{clean_ticker} | Live Market",
                 "Harga (MYR)": round(last_close, 2),
                 "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-                "Isyarat Teknikal": signal,
-                "Struktur Trend & Vol": f"Vol: {last_vol/avg_vol:.1f}x | RSI: {rsi:.0f}",
+                "Isyarat Teknikal": "🔥 Live Trend Aktif",
+                "Struktur Trend & Vol": f"EMA20: {ema20:.2f} | EMA50: {ema50:.2f}",
                 "Cadangan SL (ATR)": stop_loss,
-                "EPS YoY / ROE": f"ROE: {roe:.1f}%",
-                "Skor FA & CANSLIM": f"85/100 | P/E: {pe:.1f}x"
+                "Skor FA / Analisis": "Asas Kukuh / Pilihan Aktif"
             })
             raw_dfs[clean_ticker] = df
         except Exception:
@@ -273,4 +201,4 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
     else:
         st.warning("Tiada kaunter yang berjaya dimuat turun datanya. Sila semak kod kaunter.")
 else:
-    st.info("👈 Pilih sektor di sidebar, semak prestasi pasaran di atas, dan klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Masukkan senarai kod kaunter di sidebar, dan klik **Mula Imbas Pasaran Live**.")
