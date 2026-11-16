@@ -5,32 +5,32 @@ import yfinance as yf
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
-st.title("📈 MYX Swing Pro: BOB & BOD Screener & Sector Rotation (Bursa Malaysia)")
-st.markdown("Sistem imbasan automatik mengikut sektor berpotensi, mengesan kaunter *Breakout of Base (BOB)* & *Breakout of Downtrend (BOD)* lengkap ATR Stop-Loss.")
+st.title("📈 MYX Swing Pro: BOB & BOD Screener + RSI Momentum")
+st.markdown("Sistem imbasan automatik lanjutan lengkap dengan penapis RSI, pengiraan ATR Stop-Loss, dan sasaran untung (TP1).")
 
 # --- KAMUS SEKTOR BERPOTENSI DI BURSA MALAYSIA ---
 sector_dict = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": "GAMUDA.KL, SUNCON.KL, IJM.KL, MRCB.KL, WCT.KL, KERJAYA.KL, EBP.KL",
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": "SAMAIDEN.KL, PEKAT.KL, TENAGA.KL, YTLPOWR.KL, MEGAFB.KL, CYPARK.KL",
+    "🔥 Pembinaan & Infrastruktur (Construction)": "GAMUDA.KL, SUNCON.KL, IJM.KL, MRCB.KL, WCT.KL, KERJAYA.KL",
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": "SAMAIDEN.KL, PEKAT.KL, TENAGA.KL, YTLPOWR.KL, MEGAFB.KL",
     "💻 Teknologi & Semikonduktor (Tech)": "FRONTKN.KL, INARI.KL, KGB.KL, MYEG.KL, PENTA.KL, MPI.KL, UNISEM.KL",
-    "🏥 Penjagaan Kesihatan (Healthcare)": "KPJ.KL, IHH.KL, TOPGLOV.KL, HARTALEGA.KL, SUPERMAX.KL",
-    "⚙️ Perindustrian & Komunikasi (Industrial/Telco)": "TMK.KL, CDB.KL, MAXIS.KL, SIME.KL, PMETAL.KL, HAPSENG.KL",
+    "🏥 Penjagaan Kesihatan (Healthcare)": "KPJ.KL, IHH.KL, TOPGLOV.KL, HARTALEGA.KL",
+    "🌾 Perladangan & Komoditi (Plantation)": "KLK.KL, SD Guthrie.KL, IOICORP.KL, FGV.KL, HAPSENG.KL",
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": "TMK.KL, CDB.KL, MAXIS.KL, SIME.KL, PMETAL.KL",
     "✨ Custom / Masukkan Sendiri": "TMK.KL, PEKAT.KL, KPJ.KL, SUNCON.KL, SAMAIDEN.KL, FRONTKN.KL"
 }
 
-# --- SIDEBAR: PILIHAN SEKTOR & TETAPAN ---
-st.sidebar.header("⚙️ Tetapan & Sektor Pasaran")
+# --- SIDEBAR: TETAPAN ---
+st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
 
-selected_sector = st.sidebar.selectbox("Pilih Sektor Berpotensi:", list(sector_dict.keys()))
-
-# Automatik isi senarai kaunter berdasarkan pilihan sektor
+selected_sector = st.sidebar.selectbox("Pilih Sektor Pasaran:", list(sector_dict.keys()))
 default_tickers_for_sector = sector_dict[selected_sector]
-ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh ubah jika perlu):", default_tickers_for_sector)
+ticker_input = st.sidebar.text_area("Senarai Kod Kaunter:", default_tickers_for_sector)
 
 vol_mult = st.sidebar.slider("Gandaan Volume Minimum (vs Purata 20H)", 1.0, 3.0, 1.5, 0.1)
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.20, step=0.05)
+max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought Ekstrem)", 70, 95, 85, 1)
 
-if st.sidebar.button("🚀 Mula Imbas Sektor Terpilih", type="primary"):
+if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
     tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
     
     scan_results = []
@@ -50,16 +50,25 @@ if st.sidebar.button("🚀 Mula Imbas Sektor Terpilih", type="primary"):
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
                 
+            # Penunjuk Teknikal
             df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
             df['SMA200'] = df['Close'].rolling(window=200).mean() if len(df) >= 200 else df['Close'].rolling(window=len(df)).mean()
             df['AvgVol20'] = df['Volume'].rolling(window=20).mean()
             
+            # Pengiraan ATR (14)
             high_low = df['High'] - df['Low']
             high_close = np.abs(df['High'] - df['Close'].shift())
             low_close = np.abs(df['Low'] - df['Close'].shift())
             true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
             df['ATR'] = true_range.rolling(window=14).mean()
+            
+            # Pengiraan RSI (14)
+            delta = df['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['RSI'] = 100 - (100 / (1 + rs))
             
             last_close = float(df['Close'].iloc[-1])
             last_vol = float(df['Volume'].iloc[-1])
@@ -68,8 +77,9 @@ if st.sidebar.button("🚀 Mula Imbas Sektor Terpilih", type="primary"):
             ema50 = float(df['EMA50'].iloc[-1])
             sma200 = float(df['SMA200'].iloc[-1]) if not np.isnan(df['SMA200'].iloc[-1]) else ema50
             atr = float(df['ATR'].iloc[-1])
+            rsi = float(df['RSI'].iloc[-1])
             
-            if last_close < min_price:
+            if last_close < min_price or rsi > max_rsi:
                 continue
                 
             is_uptrend = (last_close > ema20) and (ema20 > ema50) and (last_close > sma200)
@@ -99,6 +109,7 @@ if st.sidebar.button("🚀 Mula Imbas Sektor Terpilih", type="primary"):
                     "Kaunter": ticker.replace(".KL", ""),
                     "Harga (RM)": round(last_close, 2),
                     "Status Isyarat": signal,
+                    "RSI (14)": round(rsi, 1),
                     "Volume Terkini": int(last_vol),
                     "Cadangan Stop-Loss (RM)": stop_loss,
                     "Sasaran Untung (TP1)": tp1
@@ -111,19 +122,19 @@ if st.sidebar.button("🚀 Mula Imbas Sektor Terpilih", type="primary"):
     status_text.text("Imbasan selesai!")
     
     if scan_results:
-        st.success(f"Berjaya mengesan {len(scan_results)} kaunter yang memenuhi kriteria dalam sektor ini!")
+        st.success(f"Berjaya mengesan {len(scan_results)} kaunter berkualiti tinggi!")
         result_df = pd.DataFrame(scan_results)
         st.dataframe(result_df, use_container_width=True)
         
-        # Butang Muat Turun Fail CSV
+        # Butang Muat Turun CSV
         csv_data = result_df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Muat Turun Laporan Sektor (CSV)",
+            label="📥 Muat Turun Laporan Pro (CSV)",
             data=csv_data,
-            file_name=f"bursa_{selected_sector[:10].strip()}_signals.csv",
+            file_name=f"bursa_pro_{selected_sector[:10].strip()}.csv",
             mime="text/csv",
         )
     else:
-        st.warning("Tiada kaunter yang memenuhi kriteria ketat BOB/BOD dalam sektor ini buat masa ini.")
+        st.warning("Tiada kaunter yang memenuhi kriteria ketat dengan penapis RSI semasa.")
 else:
-    st.info("👈 Pilih sektor berpotensi di bahagian kiri (Sidebar) dan klik butang **Mula Imbas Sektor Terpilih**.")
+    st.info("👈 Pilih sektor, Laraskan tetapan RSI di sidebar, dan klik **Mula Imbas Pasaran Pro**.")
