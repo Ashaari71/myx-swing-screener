@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import requests
-import streamlit.components.v1 as components
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
@@ -14,8 +15,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Live Screener & Official TradingView Charts")
-st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Carta TradingView Dinamik, Risiko & Telegram")
+st.title("📈 MYX Swing Pro: Live Screener, BOB/BOD & Professional Charts")
+st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi 5 Hari, Carta Teknikal BOB/BOD, Risiko & Telegram")
 
 # --- SENARAI SEKTOR BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -39,7 +40,7 @@ try:
 except Exception:
     klci_text = "FBM KLCI: 1,588.03 (+0.34%)"
 
-st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance & Sektor Aktif")
+st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance & Analisis Teknikal Aktif")
 
 # --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI) ---
 st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Live)")
@@ -109,7 +110,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
         st.error("Sila masukkan sekurang-kurangnya satu kod kaunter di ruangan sidebar.")
     else:
         scan_results = []
-        raw_tickers = []
+        raw_data_dict = {}
         
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -118,47 +119,60 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
         for idx, ticker in enumerate(tickers):
             status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
             
-            last_close = 1.25
-            price_change_pct = 2.50
             try:
                 stock = yf.Ticker(ticker)
                 df = stock.history(period="6mo", interval="1d")
-                if not df.empty and len(df) >= 2:
+                if not df.empty and len(df) >= 20:
+                    df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+                    df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+                    df['VolMA20'] = df['Volume'].rolling(window=20).mean()
+                    
                     last_close = float(df['Close'].iloc[-1])
                     prev_close = float(df['Close'].iloc[-2])
                     price_change_pct = ((last_close - prev_close) / prev_close) * 100
+                    
+                    last_vol = float(df['Volume'].iloc[-1])
+                    avg_vol = float(df['VolMA20'].iloc[-1]) if not np.isnan(df['VolMA20'].iloc[-1]) else last_vol
+                    vol_ratio = last_vol / avg_vol if avg_vol > 0 else 1.0
+                    
+                    ema20 = float(df['EMA20'].iloc[-1])
+                    ema50 = float(df['EMA50'].iloc[-1])
+                    
+                    # Logik Pengesanan Teknik BOB / BOD / Trend
+                    signal = "📈 Trend Positif (Normal)"
+                    if last_close > ema20 and ema20 > ema50:
+                        if vol_ratio >= 1.5:
+                            signal = "🔥 BOB (Breakout of Base) + Vol Surge!"
+                        else:
+                            signal = "⚡ Uptrend Sihat (EMA 20 > 50)"
+                    elif last_close > ema50 and last_close < ema20:
+                        signal = "🔄 BOD (Breakout of Downtrend Setup)"
+                    
+                    clean_ticker = ticker.replace('.KL', '')
+                    scan_results.append({
+                        "Kaunter & Sektor": f"{clean_ticker} | Live Market",
+                        "Harga (MYR)": round(last_close, 2),
+                        "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
+                        "Isyarat Teknikal": signal,
+                        "Vol Ratio": f"{vol_ratio:.1f}x",
+                        "Cadangan SL (ATR)": round(last_close * 0.93, 2),
+                    })
+                    raw_data_dict[clean_ticker] = df
             except Exception:
                 pass
                 
-            clean_ticker = ticker.replace('.KL', '')
-            
-            # Pengesanan teknik asas BOB/BOD untuk paparan jadual
-            tech_signal = "🔥 Trend Positif Aktif"
-            if price_change_pct > 3.0:
-                tech_signal = "⚡ BOD / BOB Momentum Breakout"
-                
-            scan_results.append({
-                "Kaunter & Sektor": f"{clean_ticker} | Live Market",
-                "Harga (MYR)": round(last_close, 2),
-                "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-                "Isyarat Teknikal": tech_signal,
-                "Cadangan SL (ATR)": round(last_close * 0.93, 2),
-                "Analisis": "Sokongan Kuat / Volum Stabil"
-            })
-            raw_tickers.append(clean_ticker)
-            
             progress_bar.progress((idx + 1) / total)
             
         status_text.text("Imbasan selesai!")
         
         if scan_results:
-            st.success(f"Berjaya memaparkan analisis untuk {len(scan_results)} kaunter!")
+            st.success(f"Berjaya mengesan {len(scan_results)} kaunter aktif!")
             result_df = pd.DataFrame(scan_results)
             st.dataframe(result_df, use_container_width=True, hide_index=True)
             
             if telegram_token and telegram_chat_id:
                 if st.button("📲 Hantar Keputusan ke Telegram"):
-                    msg_text = "🚨 *MYX LIVE SCAN ALERT* 🚨\n\nKaunter Aktif Dikesan:\n"
+                    msg_text = "🚨 *MYX LIVE SWING ALERT* 🚨\n\nKaunter Dikesan:\n"
                     for item in scan_results:
                         name = item["Kaunter & Sektor"].split(" | ")[0]
                         price = item["Harga (MYR)"]
@@ -171,35 +185,50 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                     else:
                         st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
             
-            # --- CARTA TRADINGVIEW DINAMIK MENGIKUT SENARAI KAUNTER YANG DIIMBAS ---
+            # --- CARTA INTERAKTIF PRO (MENGIKUT KAUNTER & BOB/BOD) ---
             st.markdown("---")
-            st.subheader("📊 Live TradingView Advanced Charts (Mengikut Kaunter Imbasan)")
-            st.markdown("Setiap carta di bawah dimuat turun secara langsung untuk kaunter Bursa Malaysia pilihan anda, lengkap dengan alatan melukis (*drawing tools*).")
+            st.subheader("📊 Carta Analisis Teknikal & Indikator Trend Semasa (EMA 20/50 & Volum)")
             
-            for t_name in raw_tickers:
-                with st.expander(f"📈 Papar Carta TradingView: {t_name}"):
-                    tv_html = f"""
-                    <div class="tradingview-widget-container" style="height:550px;width:100%">
-                      <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
-                      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                      {{
-                        "width": "100%",
-                        "height": "550",
-                        "symbol": "MYX:{t_name}",
-                        "interval": "D",
-                        "timezone": "Asia/Kuala_Lumpur",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "en",
-                        "hide_side_toolbar": false,
-                        "allow_symbol_change": true,
-                        "calendar": false,
-                        "support_host": "https://www.tradingview.com"
-                      }}
-                      </script>
-                    </div>
-                    """
-                    components.html(tv_html, height=570)
+            for t_name, df_chart in raw_data_dict.items():
+                with st.expander(f"📈 Analisis Terperinci & Carta Profesional: {t_name}"):
+                    # Papar butang pautan rasmi TradingView untuk kaunter ini
+                    tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+                    st.markdown(f"🔗 [Buka Kaunter {t_name} Terus di TradingView Rasmi untuk Drawing Tools Penuh]({tv_url})")
+                    
+                    # Bina Carta Plotly berganda (Harga di atas, Volum di bawah) gaya pro
+                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                                        vertical_spacing=0.03, row_heights=[0.75, 0.25])
+                    
+                    # Candlestick Standard TradingView (Hijau / Merah)
+                    fig.add_trace(go.Candlestick(
+                        x=df_chart.index,
+                        open=df_chart['Open'],
+                        high=df_chart['High'],
+                        low=df_chart['Low'],
+                        close=df_chart['Close'],
+                        name='Harga Saham',
+                        increasing_line_color='#26a69a',
+                        decreasing_line_color='#ef5350'
+                    ), row=1, col=1)
+                    
+                    # Garisan EMA 20 (Oren) & EMA 50 (Biru)
+                    fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA20'], line=dict(color='#ff9800', width=2), name='EMA 20'), row=1, col=1)
+                    fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA50'], line=dict(color='#2196f3', width=2), name='EMA 50'), row=1, col=1)
+                    
+                    # Bar Volum
+                    colors = ['#26a69a' if c >= o else '#ef5350' for c, o in zip(df_chart['Close'], df_chart['Open'])]
+                    fig.add_trace(go.Bar(x=df_chart.index, y=df_chart['Volume'], marker_color=colors, name='Volum'), row=2, col=1)
+                    
+                    fig.update_layout(
+                        title=f"Chart Analisis Harian - {t_name} (Yahoo Finance Live)",
+                        yaxis_title="Harga (MYR)",
+                        yaxis2_title="Volum",
+                        template="plotly_dark",
+                        height=600,
+                        xaxis_rangeslider_visible=False,
+                        margin=dict(l=10, r=10, t=40, b=10)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
             st.markdown("---")
             st.subheader("🧮 Simulasi Pengurusan Risiko & Saiz Pembelian")
@@ -233,5 +262,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                 file_name="bursa_swing_report.csv",
                 mime="text/csv",
             )
+        else:
+            st.warning("Tiada kaunter yang berjaya diproses.")
 else:
-    st.info("👈 Rujuk jadual prestasi sektor live di atas, masukkan senarai kod kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Pilih sektor, semak senarai kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
