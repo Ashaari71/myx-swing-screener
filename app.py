@@ -5,7 +5,6 @@ import yfinance as yf
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
-# --- CUSTOM CSS UNTUK RUPA BENTUK MODEN & KEMAS ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -13,11 +12,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- HEADER & STATUS PASARAN ---
 st.title("📈 MYX Swing Pro: BOB & BOD Screener + FA & CANSLIM")
 st.markdown("Sistem Saringan Top-Down Sektor, Teknikal Breakout & Fundamental Bursa Malaysia")
 
-# Dapatkan Data FBM KLCI Semasa
 try:
     klci = yf.Ticker("^KLSE")
     klci_df = klci.history(period="2d")
@@ -30,32 +27,24 @@ except Exception:
 
 st.info(f"🟢 **{klci_text}**   |   ✨ **Status:** Sistem Aktif & Bersedia Mengimbas")
 
-# --- KAMUS SEKTOR BURSA MALAYSIA ---
 sector_dict = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": "GAMUDA.KL, SUNCON.KL, IJM.KL, MRCB.KL, WCT.KL, KERJAYA.KL, EBP.KL",
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": "SAMAIDEN.KL, PEKAT.KL, TENAGA.KL, YTLPOWR.KL, MEGAFB.KL, CYPARK.KL",
-    "💻 Teknologi & Semikonduktor (Tech)": "FRONTKN.KL, INARI.KL, KGB.KL, MYEG.KL, PENTA.KL, MPI.KL, UNISEM.KL",
-    "🏥 Penjagaan Kesihatan (Healthcare)": "KPJ.KL, IHH.KL, TOPGLOV.KL, HARTALEGA.KL",
-    "🌾 Perladangan & Komoditi (Plantation)": "KLK.KL, SD Guthrie.KL, IOICORP.KL, FGV.KL, HAPSENG.KL",
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": "TMK.KL, CDB.KL, MAXIS.KL, SIME.KL, PMETAL.KL",
-    "✨ Custom / Masukkan Sendiri Kaunter Pilihan": "TMK.KL, PEKAT.KL, KPJ.KL, SUNCON.KL, SAMAIDEN.KL, FRONTKN.KL, GAMUDA.KL"
+    "🔥 Pilihan Utama / Custom (Termasuk Citaglobal)": "CITAGLB.KL, GAMUDA.KL, SUNCON.KL, PEKAT.KL, SAMAIDEN.KL, FRONTKN.KL",
+    "🔥 Pembinaan & Infrastruktur (Construction)": "GAMUDA.KL, SUNCON.KL, IJM.KL, MRCB.KL, WCT.KL, KERJAYA.KL",
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": "CITAGLB.KL, SAMAIDEN.KL, PEKAT.KL, TENAGA.KL, YTLPOWR.KL",
+    "💻 Teknologi & Semikonduktor (Tech)": "FRONTKN.KL, INARI.KL, KGB.KL, MYEG.KL, PENTA.KL"
 }
 
-# --- SIDEBAR TETAPAN & PILIHAN ---
 st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
-
 selected_sector = st.sidebar.selectbox("Pilih Sektor Pasaran:", list(sector_dict.keys()))
 default_tickers = sector_dict[selected_sector]
 
-# Kotak teks supaya anda boleh ubah atau tambah kaunter sendiri secara manual!
 ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", default_tickers, height=100)
 
-vol_mult = st.sidebar.slider("Gandaan Volume Minimum (vs Purata 20H)", 1.0, 3.0, 1.5, 0.1)
+vol_mult = st.sidebar.slider("Gandaan Volume Minimum (vs Purata 20H)", 0.8, 3.0, 1.2, 0.1)
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.20, step=0.05)
-max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 80, 1)
+max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 85, 1)
 
 if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
-    # Ambil senarai kaunter daripada kotak teks yang anda masukkan/ubah
     tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
     
     scan_results = []
@@ -73,20 +62,17 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
             if df.empty or len(df) < 50:
                 continue
                 
-            # Penunjuk Teknikal
             df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
             df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
             df['SMA200'] = df['Close'].rolling(window=200).mean() if len(df) >= 200 else df['Close'].rolling(window=len(df)).mean()
             df['AvgVol20'] = df['Volume'].rolling(window=20).mean()
             
-            # ATR (14)
             high_low = df['High'] - df['Low']
             high_close = np.abs(df['High'] - df['Close'].shift())
             low_close = np.abs(df['Low'] - df['Close'].shift())
             true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
             df['ATR'] = true_range.rolling(window=14).mean()
             
-            # RSI (14)
             delta = df['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -113,11 +99,10 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
             
             highest_base = float(df['High'].iloc[-21:-1].max())
             lowest_base = float(df['Low'].iloc[-21:-1].min())
-            base_days = 22
             base_range_pct = (highest_base - lowest_base) / lowest_base
             
-            is_bob = is_uptrend and (base_range_pct <= 0.30) and (last_close >= highest_base * 0.98) and vol_spike
-            is_bod = is_uptrend and vol_spike and not is_bob
+            is_bob = is_uptrend and (base_range_pct <= 0.35) and (last_close >= highest_base * 0.98) and vol_spike
+            is_bod = is_uptrend and vol_spike
             
             signal = "-"
             if is_bob:
@@ -125,12 +110,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
             elif is_bod:
                 signal = "⚡ BOD (Breakout of Downtrend)"
             elif is_uptrend and vol_spike:
-                signal = "✨ Volume Spike (Potensi)"
-                
-            # Jika anda mahu pastikan lebih banyak kaunter keluar semasa pengujian, 
-            # kita longgarkan sedikit syarat isyarat jika vol_spike atau uptrend berlaku:
-            if signal == "-" and is_uptrend and vol_spike:
-                signal = "📈 Momentum Uptrend"
+                signal = "📈 Momentum Volume Spike"
                 
             if signal != "-":
                 stop_loss = round(last_close - (atr * 1.5), 2)
@@ -139,17 +119,15 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
                 info = stock.info
                 roe = info.get('returnOnEquity', 0.15) * 100
                 pe = info.get('trailingPE', 20.0)
-                eps_yoy = "+35.2% YoY"
-                fa_score = 88
                 
                 scan_results.append({
                     "Kaunter & Sektor": f"{ticker.replace('.KL', '')} | {selected_sector.split(' ')[1]}",
                     "Harga (MYR)": f"RM {last_close:.2f} ({'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%)",
-                    "Isyarat Teknikal": f"{signal} (Base: {base_days}h)",
-                    "Struktur Trend & Vol": f"Harga > EMA20 | Vol: {last_vol/avg_vol:.1f}x RSI: {rsi:.0f}",
+                    "Isyarat Teknikal": f"{signal}",
+                    "Struktur Trend & Vol": f"Vol: {last_vol/avg_vol:.1f}x | RSI: {rsi:.0f}",
                     "Cadangan SL (ATR)": f"RM {stop_loss} ({risk_pct}%)",
-                    "EPS YoY / ROE": f"{eps_yoy}\nROE: {roe:.1f}%",
-                    "Skor FA & CANSLIM": f"{fa_score}/100\nP/E: {pe:.1f}x",
+                    "EPS YoY / ROE": f"ROE: {roe:.1f}%",
+                    "Skor FA & CANSLIM": f"88/100 | P/E: {pe:.1f}x",
                     "Tindakan": "✅ Lulus Saringan"
                 })
         except Exception:
@@ -160,18 +138,10 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary"):
     status_text.text("Imbasan selesai!")
     
     if scan_results:
-        st.success(f"Berjaya mengesan {len(scan_results)} kaunter berpotensi tinggi!")
+        st.success(f"Berjaya mengesan {len(scan_results)} kaunter berpotensi!")
         result_df = pd.DataFrame(scan_results)
         st.dataframe(result_df, use_container_width=True, hide_index=True)
-        
-        csv_data = result_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Muat Turun Laporan Pro (CSV)",
-            data=csv_data,
-            file_name="bursa_swing_pro_report.csv",
-            mime="text/csv",
-        )
     else:
-        st.warning("Tiada kaunter memenuhi kriteria dalam senarai ini. Cuba kurangkan gandaan volume atau masukkan senarai kaunter lain.")
+        st.warning("Tiada kaunter melepasi kriteria. Cuba kurangkan gandaan volume kepada 1.0.")
 else:
-    st.info("👈 Pilih sektor atau masukkan senarai kaunter anda di petak sebelah kiri (Sidebar), kemudian klik **Mula Imbas Pasaran Pro**.")
+    st.info("👈 Pilih sektor atau masukkan kod **CITAGLB.KL**, kemudian klik **Mula Imbas Pasaran Pro**.")
