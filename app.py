@@ -17,7 +17,7 @@ st.markdown("""
 st.title("📈 MYX Swing Pro: Live Screener & Official TradingView Charts")
 st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Carta TradingView Sebenar, Risiko & Telegram")
 
-# --- SENARAI SEKTOR BURSA MALAYSIA & PENGIRAAN 5 HARI SEBENAR ---
+# --- SENARAI SEKTOR BURSA MALAYSIA ---
 sector_benchmarks = {
     "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL"],
     "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL"],
@@ -77,7 +77,8 @@ st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
 selected_sector = st.sidebar.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
 default_tickers = ", ".join(sector_benchmarks[selected_sector])
 
-ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", default_tickers, height=100)
+# Pastikan nilai default sentiasa wujud
+ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=100)
 
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.10, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 95, 1)
@@ -105,124 +106,126 @@ def send_telegram_message(token, chat_id, message):
 if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
     tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
     
-    scan_results = []
-    raw_tickers = []
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    total = len(tickers)
-    for idx, ticker in enumerate(tickers):
-        status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
-        
-        try:
-            stock = yf.Ticker(ticker)
-            df = stock.history(period="6mo", interval="1d")
-            
-            if not df.empty and len(df) >= 10:
-                last_close = float(df['Close'].iloc[-1])
-                prev_close = float(df['Close'].iloc[-2]) if len(df) > 1 else last_close
-                price_change_pct = ((last_close - prev_close) / prev_close) * 100
-                
-                clean_ticker = ticker.replace('.KL', '')
-                scan_results.append({
-                    "Kaunter & Sektor": f"{clean_ticker} | Live Market",
-                    "Harga (MYR)": round(last_close, 2),
-                    "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-                    "Isyarat Teknikal": "🔥 Trend Positif Aktif",
-                    "Cadangan SL (ATR)": round(last_close * 0.93, 2),
-                    "Analisis": "Sokongan Kuat / Volum Stabil"
-                })
-                raw_tickers.append(clean_ticker)
-        except Exception:
-            pass
-            
-        progress_bar.progress((idx + 1) / total)
-        
-    status_text.text("Imbasan selesai!")
-    
-    if scan_results:
-        st.success(f"Berjaya memaparkan analisis untuk {len(scan_results)} kaunter!")
-        result_df = pd.DataFrame(scan_results)
-        st.dataframe(result_df, use_container_width=True, hide_index=True)
-        
-        if telegram_token and telegram_chat_id:
-            if st.button("📲 Hantar Keputusan ke Telegram"):
-                msg_text = "🚨 *MYX LIVE SCAN ALERT* 🚨\n\nKaunter Aktif Dikesan:\n"
-                for item in scan_results:
-                    name = item["Kaunter & Sektor"].split(" | ")[0]
-                    price = item["Harga (MYR)"]
-                    sig = item["Isyarat Teknikal"]
-                    msg_text += f"• *{name}* | Harga: RM{price} | {sig}\n"
-                
-                success = send_telegram_message(telegram_token, telegram_chat_id, msg_text)
-                if success:
-                    st.success("Mesej berjaya dihantar ke Telegram!")
-                else:
-                    st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
-        
-        # --- CARTA RASMI TRADINGVIEW EMBEDDED ---
-        st.markdown("---")
-        st.subheader("📊 Live TradingView Advanced Charts (Bursa Malaysia)")
-        
-        for t_name in raw_tickers:
-            with st.expander(f"📈 Buka Carta Rasmi TradingView: {t_name}"):
-                # Kod Widget Rasmi TradingView
-                tv_html = f"""
-                <div class="tradingview-widget-container" style="height:500px;width:100%">
-                  <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
-                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                  {{
-                    "width": "100%",
-                    "height": "500",
-                    "symbol": "MYX:{t_name}",
-                    "interval": "D",
-                    "timezone": "Asia/Kuala_Lumpur",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "en",
-                    "allow_symbol_change": true,
-                    "calendar": false,
-                    "support_host": "https://www.tradingview.com"
-                  }}
-                  </script>
-                </div>
-                """
-                components.html(tv_html, height=520)
-
-        st.markdown("---")
-        st.subheader("🧮 Simulasi Pengurusan Risiko & Saiz Pembelian")
-        
-        for item in scan_results:
-            name = item["Kaunter & Sektor"].split(" | ")[0]
-            price = item["Harga (MYR)"]
-            sl = item["Cadangan SL (ATR)"]
-            
-            risk_amount = total_capital * (risk_per_trade_pct / 100.0)
-            risk_per_share = price - sl
-            
-            if risk_per_share > 0:
-                shares_to_buy = int(risk_amount / risk_per_share)
-                total_investment = shares_to_buy * price
-            else:
-                shares_to_buy = 0
-                total_investment = 0
-                
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric(label=f"📌 Kaunter: {name}", value=f"RM {price:.2f}")
-            col2.metric(label="🛡️ Cadangan Stop-Loss", value=f"RM {sl:.2f}")
-            col3.metric(label="📦 Unit Saham Disyorkan", value=f"{shares_to_buy:,} unit")
-            col4.metric(label="💰 Jumlah Modal Digunakan", value=f"RM {total_investment:,.2f}")
-            st.markdown("---")
-        
-        csv_data = result_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Muat Turun Laporan (CSV)",
-            data=csv_data,
-            file_name="bursa_swing_report.csv",
-            mime="text/csv",
-        )
+    if not tickers:
+        st.error("Sila masukkan sekurang-kurangnya satu kod kaunter di ruangan sidebar.")
     else:
-        st.warning("Sila masukkan kod kaunter di ruangan sidebar.")
+        scan_results = []
+        raw_tickers = []
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        total = len(tickers)
+        for idx, ticker in enumerate(tickers):
+            status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
+            
+            try:
+                stock = yf.Ticker(ticker)
+                df = stock.history(period="6mo", interval="1d")
+                
+                if not df.empty and len(df) >= 10:
+                    last_close = float(df['Close'].iloc[-1])
+                    prev_close = float(df['Close'].iloc[-2]) if len(df) > 1 else last_close
+                    price_change_pct = ((last_close - prev_close) / prev_close) * 100
+                    
+                    clean_ticker = ticker.replace('.KL', '')
+                    scan_results.append({
+                        "Kaunter & Sektor": f"{clean_ticker} | Live Market",
+                        "Harga (MYR)": round(last_close, 2),
+                        "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
+                        "Isyarat Teknikal": "🔥 Trend Positif Aktif",
+                        "Cadangan SL (ATR)": round(last_close * 0.93, 2),
+                        "Analisis": "Sokongan Kuat / Volum Stabil"
+                    })
+                    raw_tickers.append(clean_ticker)
+            except Exception:
+                pass
+                
+            progress_bar.progress((idx + 1) / total)
+            
+        status_text.text("Imbasan selesai!")
+        
+        if scan_results:
+            st.success(f"Berjaya memaparkan analisis untuk {len(scan_results)} kaunter!")
+            result_df = pd.DataFrame(scan_results)
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
+            
+            if telegram_token and telegram_chat_id:
+                if st.button("📲 Hantar Keputusan ke Telegram"):
+                    msg_text = "🚨 *MYX LIVE SCAN ALERT* 🚨\n\nKaunter Aktif Dikesan:\n"
+                    for item in scan_results:
+                        name = item["Kaunter & Sektor"].split(" | ")[0]
+                        price = item["Harga (MYR)"]
+                        sig = item["Isyarat Teknikal"]
+                        msg_text += f"• *{name}* | Harga: RM{price} | {sig}\n"
+                    
+                    success = send_telegram_message(telegram_token, telegram_chat_id, msg_text)
+                    if success:
+                        st.success("Mesej berjaya dihantar ke Telegram!")
+                    else:
+                        st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
+            
+            # --- CARTA RASMI TRADINGVIEW EMBEDDED ---
+            st.markdown("---")
+            st.subheader("📊 Live TradingView Advanced Charts (Bursa Malaysia)")
+            
+            for t_name in raw_tickers:
+                with st.expander(f"📈 Buka Carta Rasmi TradingView: {t_name}"):
+                    tv_html = f"""
+                    <div class="tradingview-widget-container" style="height:500px;width:100%">
+                      <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+                      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                      {{
+                        "width": "100%",
+                        "height": "500",
+                        "symbol": "MYX:{t_name}",
+                        "interval": "D",
+                        "timezone": "Asia/Kuala_Lumpur",
+                        "theme": "dark",
+                        "style": "1",
+                        "locale": "en",
+                        "allow_symbol_change": true,
+                        "calendar": false,
+                        "support_host": "https://www.tradingview.com"
+                      }}
+                      </script>
+                    </div>
+                    """
+                    components.html(tv_html, height=520)
+
+            st.markdown("---")
+            st.subheader("🧮 Simulasi Pengurusan Risiko & Saiz Pembelian")
+            
+            for item in scan_results:
+                name = item["Kaunter & Sektor"].split(" | ")[0]
+                price = item["Harga (MYR)"]
+                sl = item["Cadangan SL (ATR)"]
+                
+                risk_amount = total_capital * (risk_per_trade_pct / 100.0)
+                risk_per_share = price - sl
+                
+                if risk_per_share > 0:
+                    shares_to_buy = int(risk_amount / risk_per_share)
+                    total_investment = shares_to_buy * price
+                else:
+                    shares_to_buy = 0
+                    total_investment = 0
+                    
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric(label=f"📌 Kaunter: {name}", value=f"RM {price:.2f}")
+                col2.metric(label="🛡️ Cadangan Stop-Loss", value=f"RM {sl:.2f}")
+                col3.metric(label="📦 Unit Saham Disyorkan", value=f"{shares_to_buy:,} unit")
+                col4.metric(label="💰 Jumlah Modal Digunakan", value=f"RM {total_investment:,.2f}")
+                st.markdown("---")
+            
+            csv_data = result_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Muat Turun Laporan (CSV)",
+                data=csv_data,
+                file_name="bursa_swing_report.csv",
+                mime="text/csv",
+            )
+        else:
+            st.warning("Tiada kaunter yang berjaya diproses. Sila pastikan kod ticker betul.")
 else:
     st.info("👈 Rujuk jadual prestasi sektor live di atas, masukkan senarai kod kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
