@@ -58,7 +58,7 @@ for sec_name, t_list in sector_benchmarks.items():
         except Exception:
             pass
     if not sec_returns:
-        sec_returns = [1.2] # Fallback nilai purata jika gagal
+        sec_returns = [1.2]
     avg_ret = np.mean(sec_returns)
     status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
     sector_perf.append({
@@ -165,25 +165,26 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                     else:
                         st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
             
-            # --- CARTA RASMI TRADINGVIEW EMBEDDED ---
+            # --- CARTA RASMI TRADINGVIEW DENGAN DRAWING TOOLS & BURSA SYMBOL ---
             st.markdown("---")
-            st.subheader("📊 Live TradingView Advanced Charts (Bursa Malaysia)")
+            st.subheader("📊 Live TradingView Advanced Charts (Alatan Melukis Diaktifkan)")
             
             for t_name in raw_tickers:
-                with st.expander(f"📈 Buka Carta Rasmi TradingView: {t_name}"):
+                with st.expander(f"📈 Buka Carta TradingView & Drawing Tools: {t_name}"):
                     tv_html = f"""
-                    <div class="tradingview-widget-container" style="height:500px;width:100%">
+                    <div class="tradingview-widget-container" style="height:550px;width:100%">
                       <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
                       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
                       {{
                         "width": "100%",
-                        "height": "500",
-                        "symbol": "MYX:{t_name}",
+                        "height": "550",
+                        "symbol": "BURSA:{t_name}",
                         "interval": "D",
                         "timezone": "Asia/Kuala_Lumpur",
                         "theme": "dark",
                         "style": "1",
                         "locale": "en",
+                        "hide_side_toolbar": false,
                         "allow_symbol_change": true,
                         "calendar": false,
                         "support_host": "https://www.tradingview.com"
@@ -191,7 +192,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                       </script>
                     </div>
                     """
-                    components.html(tv_html, height=520)
+                    components.html(tv_html, height=570)
 
             st.markdown("---")
             st.subheader("🧮 Simulasi Pengurusan Risiko & Saiz Pembelian")
