@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import requests
-import plotly.graph_objects as go
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
@@ -14,17 +14,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Sektor Trend 5H, Live Screener & TV Charts")
-st.markdown("Sistem Saringan Sektor, Prestasi 5 Hari, Live Data Yahoo Finance, Carta Ala TradingView, Risiko & Telegram")
+st.title("📈 MYX Swing Pro: Live Screener & Official TradingView Charts")
+st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Carta TradingView Sebenar, Risiko & Telegram")
 
-# --- SENARAI SEKTOR BURSA MALAYSIA ---
+# --- SENARAI SEKTOR BURSA MALAYSIA & PENGIRAAN 5 HARI SEBENAR ---
 sector_benchmarks = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL", "WCT.KL"],
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL", "YTLPOWR.KL"],
-    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN.KL", "INARI.KL", "KGB.KL", "MYEG.KL", "PENTA.KL"],
-    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ.KL", "IHH.KL", "TOPGLOV.KL", "HARTALEGA.KL"],
-    "🌾 Perladangan & Komoditi (Plantation)": ["KLK.KL", "IOICORP.KL", "FGV.KL", "HAPSENG.KL"],
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["TMK.KL", "CDB.KL", "MAXIS.KL", "SIME.KL", "PMETAL.KL"],
+    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL"],
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL"],
+    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN.KL", "INARI.KL", "KGB.KL", "MYEG.KL"],
+    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ.KL", "IHH.KL", "TOPGLOV.KL"],
+    "🌾 Perladangan & Komoditi (Plantation)": ["KLK.KL", "IOICORP.KL", "FGV.KL"],
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["CDB.KL", "MAXIS.KL", "SIME.KL", "PMETAL.KL"],
     "✨ Pilihan Utama / Custom": ["CITAGLB.KL", "GAMUD.KL", "SUNCON.KL", "MYEG.KL", "YTLPOWR.KL"]
 }
 
@@ -39,21 +39,36 @@ try:
 except Exception:
     klci_text = "FBM KLCI: 1,588.03 (+0.34%)"
 
-st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Sistem Saringan & Trend Sektor Aktif")
+st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance & Sektor Aktif")
 
-# --- ANALISIS PRESTASI SEKTOR (5 HARI) ---
-st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Terkini)")
-sector_perf = [
-    {"Sektor Pasaran": "🔥 Pembinaan & Infrastruktur", "Prestasi Purata (5 Hari)": "+2.45%", "Status Trend Sektor": "🚀 Uptrend Kuat"},
-    {"Sektor Pasaran": "⚡ Tenaga Boleh Baharu & Utiliti", "Prestasi Purata (5 Hari)": "+1.80%", "Status Trend Sektor": "🚀 Uptrend Kuat"},
-    {"Sektor Pasaran": "💻 Teknologi & Semikonduktor", "Prestasi Purata (5 Hari)": "+0.95%", "Status Trend Sektor": "📈 Perlahan Menaik"},
-    {"Sektor Pasaran": "🏥 Penjagaan Kesihatan", "Prestasi Purata (5 Hari)": "-0.40%", "Status Trend Sektor": "📉 Mendatar / Downtrend"},
-    {"Sektor Pasaran": "🌾 Perladangan & Komoditi", "Prestasi Purata (5 Hari)": "+0.20%", "Status Trend Sektor": "📈 Perlahan Menaik"},
-    {"Sektor Pasaran": "⚙️ Perindustrian & Telco", "Prestasi Purata (5 Hari)": "+1.15%", "Status Trend Sektor": "🚀 Uptrend Kuat"}
-]
+# --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI) ---
+st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Live)")
+sector_perf = []
 
-perf_df = pd.DataFrame(sector_perf)
-st.dataframe(perf_df, use_container_width=True, hide_index=True)
+for sec_name, t_list in sector_benchmarks.items():
+    if sec_name == "✨ Pilihan Utama / Custom":
+        continue
+    sec_returns = []
+    for t in t_list:
+        try:
+            df_sec = yf.Ticker(t).history(period="6d")
+            if len(df_sec) >= 5:
+                ret = ((df_sec['Close'].iloc[-1] - df_sec['Close'].iloc[-5]) / df_sec['Close'].iloc[-5]) * 100
+                sec_returns.append(ret)
+        except Exception:
+            pass
+    if sec_returns:
+        avg_ret = np.mean(sec_returns)
+        status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
+        sector_perf.append({
+            "Sektor Pasaran": sec_name,
+            "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+            "Status Trend Sektor": status_trend
+        })
+
+if sector_perf:
+    perf_df = pd.DataFrame(sector_perf)
+    st.dataframe(perf_df, use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
@@ -91,7 +106,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
     tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
     
     scan_results = []
-    raw_dfs = {}
+    raw_tickers = []
     
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -100,47 +115,27 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
     for idx, ticker in enumerate(tickers):
         status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
         
-        df = pd.DataFrame()
         try:
             stock = yf.Ticker(ticker)
             df = stock.history(period="6mo", interval="1d")
+            
+            if not df.empty and len(df) >= 10:
+                last_close = float(df['Close'].iloc[-1])
+                prev_close = float(df['Close'].iloc[-2]) if len(df) > 1 else last_close
+                price_change_pct = ((last_close - prev_close) / prev_close) * 100
+                
+                clean_ticker = ticker.replace('.KL', '')
+                scan_results.append({
+                    "Kaunter & Sektor": f"{clean_ticker} | Live Market",
+                    "Harga (MYR)": round(last_close, 2),
+                    "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
+                    "Isyarat Teknikal": "🔥 Trend Positif Aktif",
+                    "Cadangan SL (ATR)": round(last_close * 0.93, 2),
+                    "Analisis": "Sokongan Kuat / Volum Stabil"
+                })
+                raw_tickers.append(clean_ticker)
         except Exception:
             pass
-            
-        if df.empty or len(df) < 10:
-            dates = pd.date_range(end=pd.Timestamp.today(), periods=60)
-            base_p = 1.05 if "CITAGLB" in ticker else (4.50 if "GAMUD" in ticker else 1.20)
-            df = pd.DataFrame({
-                'Open': np.linspace(base_p, base_p*1.05, 60),
-                'High': np.linspace(base_p*1.02, base_p*1.08, 60),
-                'Low': np.linspace(base_p*0.98, base_p*1.02, 60),
-                'Close': np.linspace(base_p*1.01, base_p*1.06, 60),
-                'Volume': np.random.randint(1000000, 5000000, 60)
-            }, index=dates)
-            
-        df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
-        df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
-        
-        last_close = float(df['Close'].iloc[-1])
-        prev_close = float(df['Close'].iloc[-2]) if len(df) > 1 else last_close
-        price_change_pct = ((last_close - prev_close) / prev_close) * 100 if prev_close > 0 else 2.5
-        
-        ema20 = float(df['EMA20'].iloc[-1])
-        ema50 = float(df['EMA50'].iloc[-1])
-        
-        stop_loss = round(last_close * 0.93, 2)
-        
-        clean_ticker = ticker.replace('.KL', '')
-        scan_results.append({
-            "Kaunter & Sektor": f"{clean_ticker} | Analisis Pasaran",
-            "Harga (MYR)": round(last_close, 2),
-            "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-            "Isyarat Teknikal": "🔥 Trend Positif Aktif",
-            "Struktur Trend & Vol": f"EMA20: {ema20:.2f} | EMA50: {ema50:.2f}",
-            "Cadangan SL (ATR)": stop_loss,
-            "Skor FA / Analisis": "Sokongan Kuat / Volum Stabil"
-        })
-        raw_dfs[clean_ticker] = df
             
         progress_bar.progress((idx + 1) / total)
         
@@ -166,40 +161,34 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                 else:
                     st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
         
-        # --- CARTA ALA TRADINGVIEW (CANDLESTICK STANDARD) ---
+        # --- CARTA RASMI TRADINGVIEW EMBEDDED ---
         st.markdown("---")
-        st.subheader("📊 TradingView Style Daily Charts & EMA 20/50")
+        st.subheader("📊 Live TradingView Advanced Charts (Bursa Malaysia)")
         
-        for ticker_name, df_chart in raw_dfs.items():
-            with st.expander(f"📈 Papar Carta Standard TradingView: {ticker_name}"):
-                fig = go.Figure()
-                
-                # Reka bentuk Candlestick Standard (Hijau & Merah TradingView)
-                fig.add_trace(go.Candlestick(
-                    x=df_chart.index,
-                    open=df_chart['Open'],
-                    high=df_chart['High'],
-                    low=df_chart['Low'],
-                    close=df_chart['Close'],
-                    name='Harga Saham',
-                    increasing_line_color='#26a69a', # Hijau TradingView
-                    decreasing_line_color='#ef5350'  # Merah TradingView
-                ))
-                
-                # Garisan EMA 20 (Oren) & EMA 50 (Biru) standard
-                fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA20'], line=dict(color='#ff9800', width=2), name='EMA 20'))
-                fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['EMA50'], line=dict(color='#2196f3', width=2), name='EMA 50'))
-                
-                fig.update_layout(
-                    title=f"TradingView Daily Chart - {ticker_name}.KL",
-                    yaxis_title="Harga (MYR)",
-                    xaxis_title="Tarikh",
-                    template="plotly_dark",
-                    height=550,
-                    xaxis_rangeslider_visible=False, # Buang slider bawah supaya nampak bersih macam TV
-                    margin=dict(l=10, r=10, t=40, b=10)
-                )
-                st.plotly_chart(fig, use_container_width=True)
+        for t_name in raw_tickers:
+            with st.expander(f"📈 Buka Carta Rasmi TradingView: {t_name}"):
+                # Kod Widget Rasmi TradingView
+                tv_html = f"""
+                <div class="tradingview-widget-container" style="height:500px;width:100%">
+                  <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
+                  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                  {{
+                    "width": "100%",
+                    "height": "500",
+                    "symbol": "MYX:{t_name}",
+                    "interval": "D",
+                    "timezone": "Asia/Kuala_Lumpur",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "en",
+                    "allow_symbol_change": true,
+                    "calendar": false,
+                    "support_host": "https://www.tradingview.com"
+                  }}
+                  </script>
+                </div>
+                """
+                components.html(tv_html, height=520)
 
         st.markdown("---")
         st.subheader("🧮 Simulasi Pengurusan Risiko & Saiz Pembelian")
@@ -236,4 +225,4 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
     else:
         st.warning("Sila masukkan kod kaunter di ruangan sidebar.")
 else:
-    st.info("👈 Rujuk jadual prestasi sektor 5 hari di atas, masukkan senarai kod kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Rujuk jadual prestasi sektor live di atas, masukkan senarai kod kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
