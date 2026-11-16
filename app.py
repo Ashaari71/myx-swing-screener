@@ -165,12 +165,12 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                     else:
                         st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
             
-            # --- CARTA RASMI TRADINGVIEW DENGAN DRAWING TOOLS & BURSA SYMBOL ---
+            # --- CARTA TRADINGVIEW DENGAN PREFIKS MYX & DRAWING TOOLS ---
             st.markdown("---")
-            st.subheader("📊 Live TradingView Advanced Charts (Alatan Melukis Diaktifkan)")
+            st.subheader("📊 Live TradingView Advanced Charts (Alatan Melukis & Prefiks MYX)")
             
             for t_name in raw_tickers:
-                with st.expander(f"📈 Buka Carta TradingView & Drawing Tools: {t_name}"):
+                with st.expander(f"📈 Buka Carta TradingView: {t_name}"):
                     tv_html = f"""
                     <div class="tradingview-widget-container" style="height:550px;width:100%">
                       <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
@@ -178,7 +178,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                       {{
                         "width": "100%",
                         "height": "550",
-                        "symbol": "BURSA:{t_name}",
+                        "symbol": "MYX:{t_name}",
                         "interval": "D",
                         "timezone": "Asia/Kuala_Lumpur",
                         "theme": "dark",
