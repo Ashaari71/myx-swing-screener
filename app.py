@@ -165,9 +165,9 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                     else:
                         st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
             
-            # --- CARTA TRADINGVIEW DENGAN PREFIKS MYX & DRAWING TOOLS ---
+            # --- CARTA TRADINGVIEW MENGIKUT KAUNTER ---
             st.markdown("---")
-            st.subheader("📊 Live TradingView Advanced Charts (Alatan Melukis & Prefiks MYX)")
+            st.subheader("📊 Live TradingView Advanced Charts (Mengikut Kaunter Imbasan)")
             
             for t_name in raw_tickers:
                 with st.expander(f"📈 Buka Carta TradingView: {t_name}"):
