@@ -59,15 +59,47 @@ def fetch_tradingview_scanner(tickers):
         pass
     return {}
 
-# --- SIDEBAR TETAPAN ---
+# --- SIDEBAR TETAPAN & KALKULATOR POSISI ---
 st.sidebar.header("⚙️ Kriteria Tapisan")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
 min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -3.0, 0.5)
 
 st.sidebar.markdown("---")
+st.sidebar.header("🔔 Telegram Bot Alert")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
+
+# --- KALKULATOR SAIZ POSISI & RISIKO DI SIDEBAR ---
+st.sidebar.markdown("---")
+st.sidebar.header("🧮 Kalkulator Saiz Posisi & Risiko")
+calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
+calc_risk_pct = st.sidebar.slider("Risiko Maksimum (% dari Modal):", 1.0, 5.0, 2.0, 0.5)
+calc_entry = st.sidebar.number_input("Harga Beli (Entry) (RM):", value=1.00, step=0.01)
+calc_sl = st.sidebar.number_input("Harga Stop-Loss (SL) (RM):", value=0.92, step=0.01)
+calc_tp = st.sidebar.number_input("Harga Target (TP) (RM):", value=1.20, step=0.01)
+
+# Pengiraan matematik risiko & saiz posisi
+if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
+    max_risk_rm = calc_capital * (calc_risk_pct / 100.0)
+    risk_per_share = calc_entry - calc_sl
+    suggested_shares = int(max_risk_rm / risk_per_share)
+    total_investment = suggested_shares * calc_entry
+    potential_profit = suggested_shares * (calc_tp - calc_entry) if calc_tp > calc_entry else 0
+    risk_reward_ratio = (calc_tp - calc_entry) / (calc_entry - calc_sl) if (calc_entry - calc_sl) > 0 else 0
+    
+    st.sidebar.markdown(f"""
+    <div style="background-color: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px;">
+        <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Keputusan Pengiraan:</p>
+        <p style="margin:2px 0;">📦 <b>Jumlah Unit Saham:</b> {suggested_shares:,} unit</p>
+        <p style="margin:2px 0;">💰 <b>Jumlah Modal Diguna:</b> RM {total_investment:,.2f}</p>
+        <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Kerugian:</b> RM {max_risk_rm:,.2f} ({calc_risk_pct}%)</p>
+        <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi Untung (TP):</b> RM {potential_profit:,.2f}</p>
+        <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R:</b> 1 : {risk_reward_ratio:.2f}</p>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.sidebar.warning("Sila pastikan Harga Entry lebih tinggi daripada Harga Stop-Loss.")
 
 def send_telegram_message(token, chat_id, message):
     try:
@@ -222,14 +254,12 @@ else:
                     scan_results.append(item_data)
                     raw_tickers.append(t)
                     
-                    # Kumpul senarai kaunter yang berpotensi entry untuk mesej Telegram
                     if "BOB" in signal or "BOD" in signal:
                         alert_messages.append(f"• *{t}* | Harga: RM {entry_price} | Setup: {signal} | Vol: {vol:,.0f}")
                     
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
         
-        # Hantar mesej alert auto ke Telegram sekiranya ada setup entry dikesan
         if alert_messages and telegram_token and telegram_chat_id:
             full_msg = f"🚨 *MYX SWING ENTRY ALERT* 🚨\nSistem mengesan kaunter berpotensi tinggi:\n" + "\n".join(alert_messages)
             success = send_telegram_message(telegram_token, telegram_chat_id, full_msg)
@@ -252,25 +282,4 @@ else:
         })
 
     if sector_perf:
-        perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
-        st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-
-    if st.session_state.scan_results:
-        st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
-        df_display = pd.DataFrame(st.session_state.scan_results)
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-        
-        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
-        cols_tv = st.columns(6)
-        for i, t_name in enumerate(st.session_state.raw_tickers):
-            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[i % 6]:
-                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
-                
-        st.markdown("---")
-        csv_data = df_display.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
-    else:
-        st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
+        perf_df = pd.DataFrame(sector
