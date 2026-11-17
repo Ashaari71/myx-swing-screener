@@ -14,12 +14,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Live Screener & TradingView Quick Links")
-st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi 5 Hari, Pautan Rasmi TradingView, Risiko & Telegram")
+st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Pautan Rasmi TradingView, Risiko & Telegram")
 
 # --- SENARAI SEKTOR BURSA MALAYSIA ---
 sector_benchmarks = {
     "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD.KL", "SUNCON.KL", "IJM.KL", "MRCB.KL"],
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TNB.KL"],
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB.KL", "SAMAIDEN.KL", "PEKAT.KL", "TENAGA.KL"],
     "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN.KL", "INARI.KL", "KGB.KL", "MYEG.KL"],
     "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ.KL", "IHH.KL", "TOPGLOV.KL"],
     "🌾 Perladangan & Komoditi (Plantation)": ["KLK.KL", "IOICORP.KL", "FGV.KL"],
@@ -27,71 +27,28 @@ sector_benchmarks = {
     "✨ Pilihan Utama / Custom": ["CITAGLB.KL", "GAMUD.KL", "SUNCON.KL", "MYEG.KL", "TNB.KL"]
 }
 
-# Dapatkan Data FBM KLCI Semasa Live
-try:
-    klci = yf.Ticker("^KLSE")
-    klci_df = klci.history(period="5d")
-    klci_price = float(klci_df['Close'].iloc[-1])
-    klci_prev = float(klci_df['Close'].iloc[0])
-    klci_change = ((klci_price - klci_prev) / klci_prev) * 100
-    klci_text = f"FBM KLCI: {klci_price:,.2f} ({'+' if klci_change >= 0 else ''}{klci_change:.2f}% dalam 5H)"
-except Exception:
-    klci_text = "FBM KLCI: 1,588.03 (+0.34%)"
-
-st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance & Sektor Aktif")
-
-# --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI) ---
-st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Live)")
-sector_perf = []
-
-for sec_name, t_list in sector_benchmarks.items():
-    if sec_name == "✨ Pilihan Utama / Custom":
-        continue
-    sec_returns = []
-    for t in t_list:
-        try:
-            df_sec = yf.Ticker(t).history(period="6d")
-            if len(df_sec) >= 5:
-                ret = ((df_sec['Close'].iloc[-1] - df_sec['Close'].iloc[-5]) / df_sec['Close'].iloc[-5]) * 100
-                sec_returns.append(ret)
-        except Exception:
-            pass
-    if not sec_returns:
-        sec_returns = [1.2]
-    avg_ret = np.mean(sec_returns)
-    status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
-    sector_perf.append({
-        "Sektor Pasaran": sec_name,
-        "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-        "Status Trend Sektor": status_trend
-    })
-
-perf_df = pd.DataFrame(sector_perf)
-st.dataframe(perf_df, use_container_width=True, hide_index=True)
-
-st.markdown("---")
-
-# --- SIDEBAR: TETAPAN & PENAPIS (DILETAK KOD KAUNTER DI ATAS SEBELAH KIRI) ---
+# --- SIDEBAR: TETAPAN UTAMA ---
 st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
 
 selected_sector = st.sidebar.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
 default_tickers = ", ".join(sector_benchmarks[selected_sector])
 
-# Letak text_area di atas sekali dalam sidebar
-ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=120)
+ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=110)
 
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.10, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 95, 1)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧮 Kalkulator Risiko & Modal")
+total_capital = st.sidebar.number_input("Jumlah Modal Dagangan (RM)", value=10000.0, step=1000.0)
+risk_per_trade_pct = st.sidebar.slider("Risiko Yang Dibenarkan (%)", 0.5, 3.0, 1.0, 0.5)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🤖 Tetapan Telegram Bot")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password", placeholder="Masukkan token bot...")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID", placeholder="Masukkan chat ID...")
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🧮 Kalkulator Risiko & Modal")
-total_capital = st.sidebar.number_input("Jumlah Modal Dagangan (RM)", value=10000.0, step=1000.0)
-risk_per_trade_pct = st.sidebar.slider("Risiko Yang Dibenarkan (%)", 0.5, 3.0, 1.0, 0.5)
+run_scan = st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary")
 
 def send_telegram_message(token, chat_id, message):
     try:
@@ -102,8 +59,53 @@ def send_telegram_message(token, chat_id, message):
     except Exception:
         return False
 
+# Dapatkan Data FBM KLCI Semasa Live
+try:
+    klci = yf.Ticker("^KLSE")
+    klci_df = klci.history(period="5d")
+    klci_price = float(klci_df['Close'].iloc[-1])
+    klci_prev = float(klci_df['Close'].iloc[0])
+    klci_change = ((klci_price - klci_prev) / klci_prev) * 100
+    klci_text = f"FBM KLCI: {klci_price:,.2f} ({'+' if klci_change >= 0 else ''}{klci_change:.2f}% dalam 5H)"
+except Exception:
+    klci_text = "FBM KLCI: Live Market Aktif"
+
+st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance Aktif")
+
+# --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI SEBENAR) ---
+st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Live)")
+sector_perf = []
+
+for sec_name, t_list in sector_benchmarks.items():
+    if sec_name == "✨ Pilihan Utama / Custom":
+        continue
+    sec_returns = []
+    for t in t_list:
+        try:
+            df_sec = yf.Ticker(t).history(period="6d")
+            if not df_sec.empty and len(df_sec) >= 2:
+                ret = ((df_sec['Close'].iloc[-1] - df_sec['Close'].iloc[0]) / df_sec['Close'].iloc[0]) * 100
+                sec_returns.append(ret)
+        except Exception:
+            pass
+    
+    if sec_returns:
+        avg_ret = np.mean(sec_returns)
+        status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
+        sector_perf.append({
+            "Sektor Pasaran": sec_name,
+            "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+            "Status Trend Sektor": status_trend
+        })
+
+if sector_perf:
+    perf_df = pd.DataFrame(sector_perf)
+    st.dataframe(perf_df, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
 # --- PROSES IMBASAN PASARAN ---
-if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
+if run_scan:
     tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
     
     if not tickers:
@@ -119,29 +121,27 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
         for idx, ticker in enumerate(tickers):
             status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
             
-            last_close = 1.25
-            price_change_pct = 2.50
             try:
                 stock = yf.Ticker(ticker)
-                df = stock.history(period="6mo", interval="1d")
+                df = stock.history(period="5d", interval="1d")
                 if not df.empty and len(df) >= 2:
                     last_close = float(df['Close'].iloc[-1])
                     prev_close = float(df['Close'].iloc[-2])
                     price_change_pct = ((last_close - prev_close) / prev_close) * 100
+                    
+                    clean_ticker = ticker.replace('.KL', '')
+                    scan_results.append({
+                        "Kaunter & Sektor": f"{clean_ticker} | Live Market",
+                        "Harga (MYR)": round(last_close, 2),
+                        "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
+                        "Isyarat Teknikal": "🔥 Trend Positif Aktif",
+                        "Cadangan SL (ATR)": round(last_close * 0.93, 2),
+                        "Analisis": "Sokongan Kuat / Volum Stabil"
+                    })
+                    raw_tickers.append(clean_ticker)
             except Exception:
                 pass
                 
-            clean_ticker = ticker.replace('.KL', '')
-            scan_results.append({
-                "Kaunter & Sektor": f"{clean_ticker} | Live Market",
-                "Harga (MYR)": round(last_close, 2),
-                "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-                "Isyarat Teknikal": "🔥 Trend Positif Aktif",
-                "Cadangan SL (ATR)": round(last_close * 0.93, 2),
-                "Analisis": "Sokongan Kuat / Volum Stabil"
-            })
-            raw_tickers.append(clean_ticker)
-            
             progress_bar.progress((idx + 1) / total)
             
         status_text.text("Imbasan selesai!")
@@ -209,5 +209,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                 file_name="bursa_swing_report.csv",
                 mime="text/csv",
             )
+        else:
+            st.warning("Tiada kaunter yang berjaya dimuat turun datanya. Sila semak sambungan atau kod kaunter.")
 else:
-    st.info("👈 Kotak senarai kod kaunter kini berada di bahagian atas sidebar. Pilih sektor atau masukkan kaunter, kemudian klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Pilih sektor di bahagian atas sidebar sebelah kiri, kemudian klik **Mula Imbas Pasaran Live**.")
