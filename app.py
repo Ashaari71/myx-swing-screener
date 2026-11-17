@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, Order Ticket & Trade Log")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Analisis Teknikal AI, Panel Tiket Pesanan & Rekod Simpanan")
+st.title("📈 MYX Swing Pro: Screener, Sektor & Order Log")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live, Tiket Pesanan & Rekod Simpanan")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -167,6 +167,28 @@ if run_scan:
     st.session_state.scanned_data_dict = scanned_data_dict
     st.session_state.raw_tickers = raw_tickers
 
+# --- 1. PAPAN PENDAHUDU SEKTOR (DILETAKKAN DI ATAS SUPAYA MUDAH DIKESAN) ---
+st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
+sector_perf = []
+for sec_name, t_list in sector_benchmarks.items():
+    sec_data = fetch_tradingview_scanner(t_list)
+    sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+    avg_ret = np.mean(sec_changes) if sec_changes else 0.0
+    status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah / Pullback")
+    sector_perf.append({
+        "Sektor Pasaran": sec_name,
+        "Avg Ret": avg_ret,
+        "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+        "Status Trend": status_trend
+    })
+
+if sector_perf:
+    perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
+    st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
+# --- 2. KEPUTUSAN SCREENER & ORDER TICKET ---
 if st.session_state.scan_results:
     st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
     
@@ -174,7 +196,6 @@ if st.session_state.scan_results:
     
     with col_table:
         st.markdown("#### 📋 Senarai Keputusan Screener")
-        # Tukar paparan kolum dataframe supaya cantik
         df_display = pd.DataFrame(st.session_state.scan_results).rename(columns={"Lot_Unit": "Lot / Unit"})
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
@@ -233,7 +254,7 @@ else:
 
 st.markdown("---")
 
-# --- SEKSYEN REKOD SIMPANAN PELAN TRADE (TRADE HISTORY LOG) ---
+# --- 3. SEKSYEN REKOD SIMPANAN PELAN TRADE (TRADE HISTORY LOG) ---
 st.subheader("📁 Rekod Simpanan Pelan Trade (Saved Trades Log)")
 if st.session_state.trade_history:
     history_df = pd.DataFrame(st.session_state.trade_history)
@@ -241,4 +262,11 @@ if st.session_state.trade_history:
     
     col_h1, col_h2 = st.columns(2)
     with col_h1:
-        hist_
+        hist_csv = history_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Muat Turun Rekod Trade (CSV)", data=hist_csv, file_name="myx_trade_history.csv", mime="text/csv")
+    with col_h2:
+        if st.button("🗑️ Padam Semua Rekod"):
+            st.session_state.trade_history = []
+            st.rerun()
+else:
+    st.info("💡 Belum ada rekod trade yang disimpan. Sila pilih kaunter dan klik **'Hantar Pesanan / Simpan Pelan Trade'** di atas.")
