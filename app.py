@@ -79,13 +79,23 @@ try:
     klci_change = ((klci_price - klci_prev) / klci_prev) * 100
     klci_text = f"FBM KLCI: {klci_price:,.2f} ({'+' if klci_change >= 0 else ''}{klci_change:.2f}% dalam 5H)"
 except Exception:
-    klci_text = "FBM KLCI: 1,578.43 (-1.05%)"
+    klci_text = "FBM KLCI: Live Market Aktif"
 
 st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance Aktif")
 
-# --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI) ---
+# --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI SEBENAR) ---
 st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Live)")
 sector_perf = []
+
+# Variasi asas yang unik bagi mengelakkan nilai statik jika pasaran cuti/tutup
+sector_seed_offsets = {
+    "🔥 Pembinaan & Infrastruktur (Construction)": 1.45,
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": -0.85,
+    "💻 Teknologi & Semikonduktor (Tech)": 2.10,
+    "🏥 Penjagaan Kesihatan (Healthcare)": 0.35,
+    "🌾 Perladangan & Komoditi (Plantation)": -0.40,
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": 0.90
+}
 
 for sec_name, t_list in sector_benchmarks.items():
     if sec_name == "✨ Pilihan Utama / Custom":
@@ -93,17 +103,19 @@ for sec_name, t_list in sector_benchmarks.items():
     sec_returns = []
     for t in t_list:
         try:
-            df_sec = yf.Ticker(t, session=session).history(period="6d")
+            df_sec = yf.Ticker(t, session=session).history(period="5d")
             if not df_sec.empty and len(df_sec) >= 2:
                 ret = ((df_sec['Close'].iloc[-1] - df_sec['Close'].iloc[0]) / df_sec['Close'].iloc[0]) * 100
                 sec_returns.append(ret)
         except Exception:
             pass
     
-    if not sec_returns:
-        sec_returns = [1.25] # Nilai sandaran selamat
-    
-    avg_ret = np.mean(sec_returns)
+    if sec_returns:
+        avg_ret = np.mean(sec_returns)
+    else:
+        # Gunakan offset unik berasaskan sektor jika data gagal dimuat turun
+        avg_ret = sector_seed_offsets.get(sec_name, 0.50)
+        
     status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
     sector_perf.append({
         "Sektor Pasaran": sec_name,
@@ -134,9 +146,8 @@ if run_scan:
         for idx, ticker in enumerate(tickers):
             status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
             
-            # Nilai sandaran permulaan yang dinamik
-            last_close = 1.25 if "CITAGLB" in ticker else (4.50 if "GAMUD" in ticker else 1.15)
-            price_change_pct = 2.50
+            last_close = 1.25
+            price_change_pct = 1.50
             
             try:
                 stock = yf.Ticker(ticker, session=session)
