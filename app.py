@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: BOB & BOD Automated Screener")
-st.markdown("Sistem Imbasan Sektor Live, Tapisan Automatik BOB/BOD (Reversal + Volum), Analisis AI & Risiko")
+st.title("📈 MYX Swing Pro: BOB & BOD Screener with Entry, SL & TP")
+st.markdown("Sistem Imbasan Automatik, Pengurusan Risiko, Entry, Stop-Loss & Target Price (TP)")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -82,7 +82,7 @@ def send_telegram_message(token, chat_id, message):
         return False
 
 # --- PANEL KAWALAN UTAMA & PILIHAN MOD ---
-st.markdown("### 🔍 Panel Imbasan & Analisis Teknikal BOB / BOD")
+st.markdown("### 🔍 Panel Imbasan & Analisis Trading Pro")
 scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
 
 if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
@@ -96,10 +96,10 @@ if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
 else:
     target_tickers = master_bursa_tickers
 
-run_scan = st.button("🚀 Mula Imbas & Analisis BOB/BOD Sekarang", type="primary", use_container_width=True)
+run_scan = st.button("🚀 Mula Imbas Pasaran Sekarang", type="primary", use_container_width=True)
 st.markdown("---")
 
-# --- KEPUTUSAN IMBASAN & ANALISIS BOB / BOD ---
+# --- KEPUTUSAN IMBASAN (DENGAN KOLUM ENTRY, SL, TP & RRR) ---
 if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
@@ -115,54 +115,54 @@ if run_scan:
             vol = info["volume"]
             
             if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
-                sl = round(price * 0.93, 2)
-                support_est = round(price * 0.95, 2)
-                resistance_est = round(price * 1.07, 2)
+                # Kiraan Pengurusan Risiko Profesional
+                entry_price = round(price, 2)
+                sl = round(entry_price * 0.93, 2)  # Stop Loss 7% di bawah harga entry
+                risk_per_share = entry_price - sl
+                
+                # Target Price (TP) menggunakan Nisbah RRR 1:2 (Ganjaran 2x ganda daripada risiko)
+                tp = round(entry_price + (risk_per_share * 2.0), 2)
                 
                 risk_amt = total_capital * (risk_per_trade_pct / 100.0)
-                risk_per_share = price - sl
-                
                 if risk_per_share > 0:
                     raw_shares = risk_amt / risk_per_share
-                    shares = max(1, round(raw_shares / 100.0)) * 100
+                    shares = max(100, round(raw_shares / 100.0) * 100) # Gandaan minimum 100 unit (1 lot)
                 else:
                     shares = 100
                     
-                inv_total = shares * price
+                inv_total = shares * entry_price
                 
-                # Logik Pengesanan Teknikal Mengikut Permintaan Anda:
-                # 1. BOB (Buy on Breakout): Tembusi rintangan / perubahan positif kuat
-                # 2. BOD (Buy on Dip): Reversal candle bullish + volum aktif/tinggi
+                # Logik Pengesanan Strategi BOB & BOD
                 if change >= 2.0 and vol > 500000:
                     signal = "🔥 BOB (Buy on Breakout)"
-                    ai_note = f"Harga berjaya merembat melepasi rintangan ringkas di RM {resistance_est} disertai ledakan volum besar. Sesuai untuk strategi pecah rintangan."
+                    ai_note = f"Harga merembat melepasi rintangan dengan volum besar. Entry: RM {entry_price}, SL: RM {sl}, TP: RM {tp} (RRR 1:2)."
                 elif change >= -1.5 and change < 2.0 and vol > 300000:
                     signal = "🔄 BOD (Buy on Dip / Reversal)"
-                    ai_note = f"Harga membuat pullback/penurunan sihat tetapi dikesan tanda lantunan (bullish reversal) di zon sokongan RM {support_est} dengan volum menyokong."
+                    ai_note = f"Pullback sihat dengan tanda lantunan (reversal) di zon sokongan. Entry: RM {entry_price}, SL: RM {sl}, TP: RM {tp} (RRR 1:2)."
                 elif change > 0:
                     signal = "📈 Momentum Positif"
-                    ai_note = f"Pergerakan harga stabil mendaki menghampiri paras rintangan RM {resistance_est}."
+                    ai_note = f"Pergerakan harga mendaki stabil. Entry: RM {entry_price}, SL: RM {sl}, TP: RM {tp}."
                 else:
                     signal = "📉 Pemerhatian Tapak"
-                    ai_note = f"Kaunter menguji kawasan tapak sokongan RM {support_est}. Tunggu pengesahan lilin pembalikan."
+                    ai_note = f"Menguji kawasan tapak sokongan. Tunggu pengesahan lilin pembalikan sebelum Entry di RM {entry_price}."
                 
                 scan_results.append({
                     "Kaunter": t,
-                    "Harga (RM)": round(price, 2),
+                    "Harga (RM)": entry_price,
                     "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
-                    "Volum": f"{vol:,.0f}",
-                    "Setup Strategi": signal,
-                    "Stop-Loss": sl,
-                    "Unit (Lot)": f"{shares:,}",
+                    "Setup": signal,
+                    "Entry (RM)": entry_price,
+                    "Stop-Loss (RM)": sl,
+                    "Target Price (TP)": tp,
+                    "Lot / Unit": f"{shares:,}",
                     "Modal (RM)": f"{inv_total:,.2f}"
                 })
                 
                 ai_breakdowns.append({
                     "Kaunter": t,
-                    "Analisis Teknikal AI (BOB / BOD)": ai_note,
-                    "Sokongan (S)": f"RM {support_est}",
-                    "Rintangan (R)": f"RM {resistance_est}"
+                    "Strategi & Pelan Trade (Entry, SL, TP)": ai_note,
+                    "Nisbah RRR": "1 : 2"
                 })
                 
                 raw_tickers.append(t)
@@ -174,8 +174,8 @@ if run_scan:
         res_df = pd.DataFrame(scan_results)
         st.dataframe(res_df, use_container_width=True, hide_index=True)
         
-        # Paparan Nota Analisis Teknikal BOB/BOD
-        st.markdown("### 🤖 Nota Analisis Teknikal AI (Strategi BOB & BOD)")
+        # Paparan Nota Analisis Strategi
+        st.markdown("### 🤖 Pelan Tindakan & Analisis Teknikal (Entry, SL & TP)")
         ai_df = pd.DataFrame(ai_breakdowns)
         st.dataframe(ai_df, use_container_width=True, hide_index=True)
         
@@ -188,7 +188,7 @@ if run_scan:
                 st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
                 
         csv_data = res_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_bob_bod_screener.csv", mime="text/csv")
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_trading_plan.csv", mime="text/csv")
     else:
         st.warning("⚠️ Tiada kaunter melepasi tapisan kriteria semasa.")
     st.markdown("---")
