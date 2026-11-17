@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
+import yfinance as yf
 from PIL import Image
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
@@ -12,17 +13,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Technical, AI Vision & Auto Fundamental Analysis")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Auto FA (CANSLIM)")
+st.title("📈 MYX Swing Pro: Technical, AI Vision & Live Fundamental Analysis")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Auto FA Berasaskan Data Live Bursa Malaysia")
 
-# --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
+# --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
     "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
     "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
     "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX"],
     "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
     "🌾 Perladangan & Komoditi (Plantation)": ["KLK", "IOICORP", "FGV", "SIMEPROP"],
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"]
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"],
+    "🏦 Perbankan & Kewangan (Banking/Finance)": ["MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK"]
 }
 
 master_bursa_tickers = []
@@ -41,9 +43,89 @@ def fetch_tradingview_scanner(tickers):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=8)
+        if response.status_code == 200:
+            data = response.json()
+            results = {}
+            for item in data.get("data", []):
+                sym = item["s"].replace("MYX:", "")
+                vals = item["d"]
+                results[sym] = {
+                    "close": vals[0] if vals[0] is not None else 0.0,
+                    "change": vals[1] if vals[1] is not None else 0.0,
+                    "volume": vals[2] if vals[2] is not None else 0,
+                    "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0
+                }
+            return results
     except Exception:
         pass
     return {}
+
+# --- FUNGSI ANALISIS FUNDAMENTAL SEBENAR MENGGUNAKAN YFINANCE ---
+def analyze_fundamental(ticker_symbol):
+    clean_symbol = ticker_symbol.strip().upper().replace('.KL', '')
+    yf_symbol = f"{clean_symbol}.KL"
+    
+    try:
+        stock = yf.Ticker(yf_symbol)
+        info = stock.info
+        
+        # Ambil data penting jika ada
+        market_cap = info.get("marketCap", 0)
+        pe_ratio = info.get("trailingPE", "N/A")
+        roe = info.get("returnOnEquity", None)
+        rev_growth = info.get("revenueGrowth", None)
+        earnings_growth = info.get("earningsQuarterlyGrowth", None)
+        long_name = info.get("longName", clean_symbol)
+        sector = info.get("sector", "Bursa Malaysia Equities")
+        
+        # Penilaian kriteria CANSLIM berasaskan data sebenar
+        score = 0
+        details = []
+        
+        # C & A (Earnings & Growth)
+        if earnings_growth is not None and earnings_growth > 0.15:
+            score += 2
+            details.append("✅ **C & A (Earnings Growth):** Pertumbuhan pendapatan suku tahunan kukuh (>15%).")
+        elif earnings_growth is not None and earnings_growth > 0:
+            score += 1
+            details.append("⚠️ **C & A (Earnings Growth):** Pertumbuhan pendapatan positif tetapi sederhana.")
+        else:
+            details.append("❌ **C & A (Earnings Growth):** Tiada data pertumbuhan positif yang ketara.")
+            
+        # S (Supply & Demand / Volume/Market Cap)
+        if market_cap and market_cap > 500000000: # > RM500 Juta
+            score += 1
+            details.append("✅ **S (Market Cap/Supply):** Syarikat berkapitalisasi pasaran sederhana/besar (stabil).")
+        else:
+            details.append("⚠️ **S (Market Cap/Supply):** Syarikat berkapitalisasi kecil (saham berisiko/volatil).")
+            
+        # L (Leader / ROE & Profitability)
+        if roe is not None and roe > 0.10: # ROE > 10%
+            score += 2
+            details.append(f"✅ **L (Profitability / ROE):** Pulangan atas ekuiti (ROE) sihat pada tingkat {(roe*100):.1f}%.")
+        else:
+            score += 1
+            details.append("⚠️ **L (Profitability / ROE):** ROE agak rendah atau tidak cukup data rekod.")
+            
+        # M (Market Direction & Valuation)
+        if pe_ratio != "N/A" and isinstance(pe_ratio, (int, float)) and 5 < pe_ratio < 30:
+            score += 2
+            details.append(f"✅ **M (Valuation P/E):** Nisbah P/E sihat dan munasabah ({pe_ratio:.1f}x).")
+        else:
+            score += 1
+            details.append("⚠️ **M (Valuation P/E):** P/E tinggi atau tiada rekod nisbah semasa.")
+            
+        return {
+            "name": long_name,
+            "sector": sector,
+            "market_cap": f"RM {market_cap:,.0f}" if market_cap else "Tidak Diketahui",
+            "pe_ratio": f"{pe_ratio:.1f}x" if isinstance(pe_ratio, (int, float)) else "N/A",
+            "score": min(7, max(3, score)), # Normalisasi skor antara 3 hingga 7
+            "details": details,
+            "valid": True
+        }
+    except Exception as e:
+        return {"valid": False, "error": str(e)}
 
 # --- SIDEBAR TETAPAN ---
 st.sidebar.header("⚙️ Kriteria Tapisan")
@@ -76,59 +158,66 @@ app_mode = st.radio(
     [
         "🔍 Screener & Prestasi Sektor", 
         "📸 AI Chart Image Scanner & Analisis Terperinci", 
-        "📊 Analisis Fundamental (Auto FA & CANSLIM)"
+        "📊 Analisis Fundamental Live (Yahoo Finance / CANSLIM)"
     ], 
     horizontal=True
 )
 st.markdown("---")
 
-if app_mode == "📊 Analisis Fundamental (Auto FA & CANSLIM)":
-    st.subheader("📊 Modul Semakan Analisis Fundamental Automatik (CANSLIM)")
-    st.markdown("Masukkan kod kaunter pilihan anda. Sistem akan menilai kekuatan fundamental secara automatik.")
+if app_mode == "📊 Analisis Fundamental Live (Yahoo Finance / CANSLIM)":
+    st.subheader("📊 Modul Semakan Analisis Fundamental Sebenar (Bursa Malaysia)")
+    st.markdown("Taip **mana-mana kod kaunter Bursa** (contoh: `MAYBANK`, `SUNCON`, `GAMUD`, `IHH`, `CIMB`, `TOPGLOV`, dll.). Sistem akan menarik data sebenar dari pasaran.")
     
     col_fa1, col_fa2 = st.columns([1, 1])
     
     with col_fa1:
-        fa_ticker = st.text_input("Masukkan Kod Kaunter (Cth: SUNCON, GAMUD, INARI, KLK):", value="SUNCON").upper().strip()
-        evaluate_fa = st.button("🚀 Jalankan Analisis Fundamental Automatik", type="primary", use_container_width=True)
+        fa_ticker = st.text_input("Masukkan Kod Kaunter Bursa:", value="SUNCON").upper().strip()
+        evaluate_fa = st.button("🚀 Semak Fundamental Live", type="primary", use_container_width=True)
 
     with col_fa2:
-        st.markdown(f"### 📑 Laporan Analisis Fundamental: **{fa_ticker}**")
+        st.markdown(f"### 📑 Laporan FA Live: **{fa_ticker}**")
         if evaluate_fa:
-            # Simulasi analisis auto berdasarkan data kekuatan pasaran bursa untuk kaunter popular
-            np.random.seed(hash(fa_ticker) % 1000)
-            score = np.random.choice([6, 7, 5, 6, 7]) # Skor tinggi untuk kaunter terpilih
-            score_pct = (score / 7) * 100
-            
-            if score >= 6:
-                status_fa = "🌟 Cemerlang (A+ Fundamental Setup)"
-                color_code = "#3fb950"
-                det_msg = "Syarikat menunjukkan pertumbuhan EPS suku tahunan yang kukuh, disokong oleh momentum kontrak baharu serta sokongan institusi yang kuat."
-            elif score >= 4:
-                status_fa = "👍 Sederhana Kukuh (Layak Diperhati)"
-                color_code = "#e3b341"
-                det_msg = "Prestasi kewangan stabil, namun perlu perhatikan sentimen volum pasaran semasa."
-            else:
-                status_fa = "⚠️ Lemah / Berhati-hati"
-                color_code = "#f85149"
-                det_msg = "Pertumbuhan pendapatan agak perlahan atau kurang mendapat sokongan institusi."
+            with st.spinner("Sedang menarik data kewangan live daripada pasaran..."):
+                fa_data = analyze_fundamental(fa_ticker)
                 
-            st.markdown(f"""
-            <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
-                <h4 style="color: {color_code}; margin-top:0;">Skor CANSLIM: {score} / 7 ({score_pct:.0f}%)</h4>
-                <p><b>Status Penilaian:</b> {status_fa}</p>
-                <hr style="border-color: #30363d;">
-                <p><b>Analisis Automatik:</b> {det_msg}</p>
-                <p><b>C - Current Earnings:</b> Positif (>20% YoY)</p>
-                <p><b>A - Annual Growth:</b> Konsisten</p>
-                <p><b>N - New Catalyst:</b> Kontrak / Produk Baharu Aktif</p>
-                <p><b>S & L - Supply, Demand & Leader:</b> Permintaan institusi kukuh di dalam sektor.</p>
-                <hr style="border-color: #30363d;">
-                <p style="color: #58a6ff;">💡 <b>Cadangan:</b> Gabungkan skor FA ini dengan setup teknikal BOB/BOD untuk hasil dagangan swing yang optimum.</p>
-            </div>
-            """, unsafe_allow_html=True)
+            if fa_data["valid"]:
+                score = fa_data["score"]
+                score_pct = (score / 7) * 100
+                
+                if score >= 6:
+                    status_fa = "🌟 Cemerlang (A+ Fundamental Setup)"
+                    color_code = "#3fb950"
+                elif score >= 4:
+                    status_fa = "👍 Sederhana Kukuh (Layak Diperhati)"
+                    color_code = "#e3b341"
+                else:
+                    status_fa = "⚠️ Lemah / Berhati-hati"
+                    color_code = "#f85149"
+                    
+                st.markdown(f"""
+                <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
+                    <h3 style="color: #58a6ff; margin-top:0;">{fa_data['name']}</h3>
+                    <p><b>Sektor:</b> {fa_data['sector']}</p>
+                    <p><b>Market Cap:</b> {fa_data['market_cap']}</p>
+                    <p><b>Nisbah P/E:</b> {fa_data['pe_ratio']}</p>
+                    <hr style="border-color: #30363d;">
+                    <h4 style="color: {color_code}; margin-top:0;">Skor Kesihatan CANSLIM: {score} / 7 ({score_pct:.0f}%)</h4>
+                    <p><b>Status Penilaian:</b> {status_fa}</p>
+                    <hr style="border-color: #30363d;">
+                """, unsafe_allow_html=True)
+                
+                for detail in fa_data["details"]:
+                    st.markdown(f"- {detail}")
+                    
+                st.markdown("""
+                    <hr style="border-color: #30363d;">
+                    <p style="color: #58a6ff;">💡 <b>Cadangan:</b> Gunakan skor asas ini bersama setup teknikal BOB/BOD semasa anda menyemak carta harga.</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error(f"Gagal mengambil data untuk kaunter **{fa_ticker}**. Sila pastikan kod kaunter betul (contoh: SUNCON, MAYBANK, IHH). Ralat: {fa_data.get('error', '')}")
         else:
-            st.info("👈 Masukkan kod kaunter di sebelah kiri dan klik **Jalankan Analisis Fundamental Automatik**.")
+            st.info("👈 Masukkan kod kaunter di sebelah kiri dan klik **Semak Fundamental Live**.")
 
 elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
