@@ -14,7 +14,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Live Screener & TradingView Quick Links")
-st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Pautan Rasmi TradingView, Risiko & Telegram")
+st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi 5 Hari, Pautan Rasmi TradingView, Risiko & Telegram")
 
 # --- SENARAI SEKTOR BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -27,14 +27,23 @@ sector_benchmarks = {
     "✨ Pilihan Utama / Custom": ["CITAGLB.KL", "GAMUD.KL", "SUNCON.KL", "MYEG.KL", "TNB.KL"]
 }
 
-# --- SIDEBAR: TETAPAN UTAMA ---
-st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
+# --- KAWALAN UTAMA DI SKRIN UTAMA (SUPAYA TIDAK TERSEMBUNYI) ---
+st.markdown("### 🔍 Panel Kawalan & Imbasan Pasaran")
+col_sel1, col_sel2 = st.columns([1, 2])
 
-selected_sector = st.sidebar.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
-default_tickers = ", ".join(sector_benchmarks[selected_sector])
+with col_sel1:
+    selected_sector = st.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
+    default_tickers = ", ".join(sector_benchmarks[selected_sector])
 
-ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=110)
+with col_sel2:
+    ticker_input = st.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=75)
 
+run_scan = st.button("🚀 Mula Imbas Pasaran Live Sekarang", type="primary", use_container_width=True)
+
+st.markdown("---")
+
+# --- SIDEBAR: TETAPAN TAMBAHAN (RISIKO & TELEGRAM) ---
+st.sidebar.header("⚙️ Tetapan Lanjutan")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.10, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 95, 1)
 
@@ -47,8 +56,6 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🤖 Tetapan Telegram Bot")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password", placeholder="Masukkan token bot...")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID", placeholder="Masukkan chat ID...")
-
-run_scan = st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary")
 
 def send_telegram_message(token, chat_id, message):
     try:
@@ -109,7 +116,7 @@ if run_scan:
     tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
     
     if not tickers:
-        st.error("Sila masukkan sekurang-kurangnya satu kod kaunter di ruangan sidebar.")
+        st.error("Sila masukkan sekurang-kurangnya satu kod kaunter.")
     else:
         scan_results = []
         raw_tickers = []
@@ -212,4 +219,4 @@ if run_scan:
         else:
             st.warning("Tiada kaunter yang berjaya dimuat turun datanya. Sila semak sambungan atau kod kaunter.")
 else:
-    st.info("👈 Pilih sektor di bahagian atas sidebar sebelah kiri, kemudian klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Pilih sektor atau masukkan kod kaunter di bahagian atas skrin, kemudian klik **Mula Imbas Pasaran Live Sekarang**.")
