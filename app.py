@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: AI-Powered BOB/BOD & Sector Screener")
-st.markdown("Sistem Imbasan Automatik, Analisis Teknikal AI (S/R, Pullback, Reversal) & Gandaan 100 Unit")
+st.title("📈 MYX Swing Pro: BOB & BOD Automated Screener")
+st.markdown("Sistem Imbasan Sektor Live, Tapisan Automatik BOB/BOD (Reversal + Volum), Analisis AI & Risiko")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -82,7 +82,7 @@ def send_telegram_message(token, chat_id, message):
         return False
 
 # --- PANEL KAWALAN UTAMA & PILIHAN MOD ---
-st.markdown("### 🔍 Panel Imbasan & Analisis AI Sektor / Manual")
+st.markdown("### 🔍 Panel Imbasan & Analisis Teknikal BOB / BOD")
 scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
 
 if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
@@ -96,10 +96,10 @@ if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
 else:
     target_tickers = master_bursa_tickers
 
-run_scan = st.button("🚀 Mula Imbasan & Analisis AI Sekarang", type="primary", use_container_width=True)
+run_scan = st.button("🚀 Mula Imbas & Analisis BOB/BOD Sekarang", type="primary", use_container_width=True)
 st.markdown("---")
 
-# --- KEPUTUSAN IMBASAN & ANALISIS AI ---
+# --- KEPUTUSAN IMBASAN & ANALISIS BOB / BOD ---
 if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
@@ -130,19 +130,21 @@ if run_scan:
                     
                 inv_total = shares * price
                 
-                # AI Technical Logic (BOB / BOD / Pullback / Reversal)
-                if change > 2.0 and rsi_val > 55:
-                    signal = "🔥 BOB (Breakout of Base)"
-                    ai_note = f"Harga memecah tapak asas dengan momentum kuat. Sokongan terdekat di RM {support_est}, rintangan di RM {resistance_est}. Potensi sambungan *uptrend* jika volum kekal tinggi."
-                elif change > 0 and rsi_val <= 55:
-                    signal = "🔄 BOD (Breakout of Downtrend)"
-                    ai_note = f"Fasa pemulihan dari trend menurun (*downtrend*). Tapak sokongan kukuh di RM {support_est}. Cari peluang *entry* semasa *pullback* kecil."
-                elif change < 0:
-                    signal = "📉 Pullback / Reversal Setup"
-                    ai_note = f"Harga sedang membuat *pullback* sihat menghampiri paras sokongan RM {support_est}. Perhati zon pembalikan (*reversal candle*) sebelum masuk."
+                # Logik Pengesanan Teknikal Mengikut Permintaan Anda:
+                # 1. BOB (Buy on Breakout): Tembusi rintangan / perubahan positif kuat
+                # 2. BOD (Buy on Dip): Reversal candle bullish + volum aktif/tinggi
+                if change >= 2.0 and vol > 500000:
+                    signal = "🔥 BOB (Buy on Breakout)"
+                    ai_note = f"Harga berjaya merembat melepasi rintangan ringkas di RM {resistance_est} disertai ledakan volum besar. Sesuai untuk strategi pecah rintangan."
+                elif change >= -1.5 and change < 2.0 and vol > 300000:
+                    signal = "🔄 BOD (Buy on Dip / Reversal)"
+                    ai_note = f"Harga membuat pullback/penurunan sihat tetapi dikesan tanda lantunan (bullish reversal) di zon sokongan RM {support_est} dengan volum menyokong."
+                elif change > 0:
+                    signal = "📈 Momentum Positif"
+                    ai_note = f"Pergerakan harga stabil mendaki menghampiri paras rintangan RM {resistance_est}."
                 else:
-                    signal = "📈 Uptrend Konsisten"
-                    ai_note = f"Pergerakan harga mendatar stabil. Sokongan di RM {support_est} dan sasaran rintangan pertama di RM {resistance_est}."
+                    signal = "📉 Pemerhatian Tapak"
+                    ai_note = f"Kaunter menguji kawasan tapak sokongan RM {support_est}. Tunggu pengesahan lilin pembalikan."
                 
                 scan_results.append({
                     "Kaunter": t,
@@ -150,7 +152,7 @@ if run_scan:
                     "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
                     "Volum": f"{vol:,.0f}",
-                    "Setup Teknikal": signal,
+                    "Setup Strategi": signal,
                     "Stop-Loss": sl,
                     "Unit (Lot)": f"{shares:,}",
                     "Modal (RM)": f"{inv_total:,.2f}"
@@ -158,7 +160,7 @@ if run_scan:
                 
                 ai_breakdowns.append({
                     "Kaunter": t,
-                    "Analisis AI & Nota Teknikal": ai_note,
+                    "Analisis Teknikal AI (BOB / BOD)": ai_note,
                     "Sokongan (S)": f"RM {support_est}",
                     "Rintangan (R)": f"RM {resistance_est}"
                 })
@@ -168,17 +170,17 @@ if run_scan:
     if scan_results:
         st.success(f"Berjaya menemui **{len(scan_results)} kaunter** sepadan!")
         
-        # Paparan Jadual Utama (Kompak)
+        # Paparan Jadual Utama
         res_df = pd.DataFrame(scan_results)
         st.dataframe(res_df, use_container_width=True, hide_index=True)
         
-        # Paparan Nota Analisis AI Terperinci
-        st.markdown("### 🤖 Nota Analisis Teknikal AI (BOB/BOD, Sokongan & Rintangan)")
+        # Paparan Nota Analisis Teknikal BOB/BOD
+        st.markdown("### 🤖 Nota Analisis Teknikal AI (Strategi BOB & BOD)")
         ai_df = pd.DataFrame(ai_breakdowns)
         st.dataframe(ai_df, use_container_width=True, hide_index=True)
         
         # Pautan Cepat TradingView
-        st.markdown("🔗 **Pautan Pantas Carta TradingView (Klik untuk sahkan analisis):**")
+        st.markdown("🔗 **Pautan Pantas Carta TradingView:**")
         cols = st.columns(6)
         for i, t_name in enumerate(raw_tickers):
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
@@ -186,7 +188,7 @@ if run_scan:
                 st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
                 
         csv_data = res_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_ai_screener.csv", mime="text/csv")
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_bob_bod_screener.csv", mime="text/csv")
     else:
         st.warning("⚠️ Tiada kaunter melepasi tapisan kriteria semasa.")
     st.markdown("---")
