@@ -98,15 +98,14 @@ st.markdown("---")
 
 if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
     st.subheader("🔗 Rujukan Pantas Data Rasmi Pasaran")
-    st.markdown("Masukkan kod kaunter Bursa Malaysia pilihan anda untuk terus merujuk data sahih di platform rasmi.")
+    st.markdown("Pilih atau semak kaunter Bursa Malaysia di bawah untuk terus merujuk data sahih di platform rasmi.")
     
     col_lk1, col_lk2 = st.columns([1, 1])
     with col_lk1:
-        ticker_input = st.text_input("Masukkan Kod Kaunter (Cth: HARTA, SAMAIDEN, SUNCON, GAMUD):", value="HARTA").upper().strip()
+        ticker_input = st.selectbox("Pilih Kaunter:", sorted(master_bursa_tickers))
     
     if ticker_input:
         bursa_url = f"https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code={ticker_input}"
-        cgstrade_url = "https://www.itradecgs.com.my/"
         klsescreener_url = f"https://www.klsescreener.com/v2/stocks/view/{ticker_input}"
         
         st.markdown(f"""
@@ -116,7 +115,6 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
             <ul>
                 <li>👉 <a href="{bursa_url}" target="_blank"><b>Semak Profil & Laporan di Bursa Malaysia Rasmi</b></a></li>
                 <li>👉 <a href="{klsescreener_url}" target="_blank"><b>Buka Analisis Kaunter di KLSE Screener</b></a></li>
-                <li>👉 <a href="{cgstrade_url}" target="_blank"><b>Buka Portal CGS-CIMB iTrade (KLSE)</b></a></li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
