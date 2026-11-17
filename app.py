@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, AI Analysis & Trade Log")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Analisis Teknikal AI, Sektor Live, Tiket Pesanan & Rekod Simpanan")
+st.title("📈 MYX Swing Pro: BOB & BOD Screener & Sector Live")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Tiket Pesanan")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -64,11 +64,6 @@ max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
 min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -3.0, 0.5)
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🧮 Risiko & Modal")
-total_capital = st.sidebar.number_input("Modal Dagangan (RM)", value=2000.0, step=500.0)
-risk_per_trade_pct = st.sidebar.slider("Risiko Dibenarkan (%)", 0.5, 3.0, 1.0, 0.5)
-
-st.sidebar.markdown("---")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
@@ -86,12 +81,8 @@ if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
 if "scanned_data_dict" not in st.session_state:
     st.session_state.scanned_data_dict = {}
-if "ai_breakdowns" not in st.session_state:
-    st.session_state.ai_breakdowns = []
 if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
-if "trade_history" not in st.session_state:
-    st.session_state.trade_history = []
 
 # --- PANEL KAWALAN UTAMA & PILIHAN MOD ---
 st.markdown("### 🔍 Panel Imbasan & Analisis Pasaran")
@@ -115,7 +106,6 @@ if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
     scanned_data_dict = {}
-    ai_breakdowns = []
     raw_tickers = []
     
     for t in target_tickers:
@@ -129,32 +119,18 @@ if run_scan:
             if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
                 entry_price = round(price, 2)
                 sl = round(entry_price * 0.93, 2)
-                support_est = round(entry_price * 0.95, 2)
-                resistance_est = round(entry_price * 1.07, 2)
                 risk_per_share = entry_price - sl
                 tp = round(entry_price + (risk_per_share * 2.0), 2)
                 
-                risk_amt = total_capital * (risk_per_trade_pct / 100.0)
-                if risk_per_share > 0:
-                    raw_shares = risk_amt / risk_per_share
-                    shares = max(100, round(raw_shares / 100.0) * 100)
-                else:
-                    shares = 100
-                    
-                inv_total = shares * entry_price
-                
+                # Logik Strategi BOB & BOD
                 if change >= 2.0 and vol > 500000:
                     signal = "🔥 BOB (Breakout)"
-                    ai_note = f"Harga merembat melepasi rintangan RM {resistance_est} dengan volum besar. Sokongan di RM {support_est}."
                 elif change >= -1.5 and change < 2.0 and vol > 300000:
                     signal = "🔄 BOD (Dip/Reversal)"
-                    ai_note = f"Pullback sihat dengan tanda lantunan (bullish reversal) di zon sokongan RM {support_est}. Volum menyokong."
                 elif change > 0:
                     signal = "📈 Momentum"
-                    ai_note = f"Pergerakan harga stabil mendaki menghampiri rintangan RM {resistance_est}."
                 else:
                     signal = "📉 Tapak / Pullback"
-                    ai_note = f"Menguji kawasan tapak sokongan RM {support_est}. Perhati lilin pembalikan (*reversal candle*)."
                 
                 item_data = {
                     "Kaunter": t,
@@ -162,30 +138,19 @@ if run_scan:
                     "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
                     "Setup": signal,
-                    "Entry": entry_price,
-                    "Stop-Loss": sl,
-                    "Target Price": tp,
-                    "Lot_Unit": f"{shares:,}",
-                    "Modal (RM)": f"{inv_total:,.2f}"
+                    "Entry (RM)": entry_price,
+                    "Stop-Loss (RM)": sl,
+                    "Target Price (TP)": tp
                 }
                 scan_results.append(item_data)
                 scanned_data_dict[t] = item_data
-                
-                ai_breakdowns.append({
-                    "Kaunter": t,
-                    "Analisis Teknikal AI (BOB / BOD, Sokongan & Rintangan)": ai_note,
-                    "Sokongan (S)": f"RM {support_est}",
-                    "Rintangan (R)": f"RM {resistance_est}"
-                })
-                
                 raw_tickers.append(t)
                 
     st.session_state.scan_results = scan_results
     st.session_state.scanned_data_dict = scanned_data_dict
-    st.session_state.ai_breakdowns = ai_breakdowns
     st.session_state.raw_tickers = raw_tickers
 
-# --- 1. PAPAN PENDAHUDU SEKTOR ---
+# --- 1. PAPAN PENDAHUDU SEKTOR (SECTOR LEADERSHIP) ---
 st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
 sector_perf = []
 for sec_name, t_list in sector_benchmarks.items():
@@ -206,7 +171,7 @@ if sector_perf:
 
 st.markdown("---")
 
-# --- 2. KEPUTUSAN SCREENER, ANALISIS AI & ORDER TICKET ---
+# --- 2. KEPUTUSAN SCREENER & ORDER TICKET ---
 if st.session_state.scan_results:
     st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
     
@@ -214,13 +179,8 @@ if st.session_state.scan_results:
     
     with col_table:
         st.markdown("#### 📋 Senarai Keputusan Screener")
-        df_display = pd.DataFrame(st.session_state.scan_results).rename(columns={"Lot_Unit": "Lot / Unit"})
+        df_display = pd.DataFrame(st.session_state.scan_results)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
-        
-        # Jadual Analisis Teknikal AI
-        st.markdown("#### 🤖 Nota Analisis Teknikal AI (BOB / BOD, Sokongan & Rintangan)")
-        ai_df = pd.DataFrame(st.session_state.ai_breakdowns)
-        st.dataframe(ai_df, use_container_width=True, hide_index=True)
         
         st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
         cols_tv = st.columns(4)
@@ -239,57 +199,25 @@ if st.session_state.scan_results:
             st.markdown(f"""
             <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d;">
                 <h3 style="margin-top:0; color: #58a6ff;">📌 {d['Kaunter']}</h3>
-                <p><b>Harga Semasa / Entry:</b> RM {d['Entry']}</p>
+                <p><b>Harga Semasa / Entry:</b> RM {d['Entry (RM)']}</p>
                 <p><b>Setup Strategi:</b> {d['Setup']}</p>
                 <hr style="border-color: #30363d;">
-                <p style="color: #f85149;">🛡️ <b>Stop-Loss (SL):</b> RM {d['Stop-Loss']}</p>
-                <p style="color: #3fb950;">🎯 <b>Take Profit (TP):</b> RM {d['Target Price']}</p>
-                <p>📦 <b>Saiz Cadangan:</b> {d['Lot_Unit']} unit</p>
-                <p>💰 <b>Jumlah Modal:</b> RM {d['Modal (RM)']}</p>
+                <p style="color: #f85149;">🛡️ <b>Stop-Loss (SL):</b> RM {d['Stop-Loss (RM)']}</p>
+                <p style="color: #3fb950;">🎯 <b>Take Profit (TP):</b> RM {d['Target Price (TP)']}</p>
             </div>
             """, unsafe_allow_html=True)
             
             order_type = st.radio("Jenis Pesanan:", ["Market Order", "Limit Order"], horizontal=True)
             
-            if st.button("🚀 Hantar Pesanan / Simpan Pelan Trade", type="primary", use_container_width=True):
-                new_record = {
-                    "Kaunter": d["Kaunter"],
-                    "Jenis Pesanan": order_type,
-                    "Entry (RM)": d["Entry"],
-                    "Stop-Loss (RM)": d["Stop-Loss"],
-                    "Target Price (RM)": d["Target Price"],
-                    "Lot / Unit": d["Lot_Unit"],
-                    "Modal (RM)": d["Modal (RM)"]
-                }
-                st.session_state.trade_history.append(new_record)
-                st.success(f"Pesanan untuk {d['Kaunter']} ({order_type}) berjaya direkod dan disimpan!")
-                
+            if st.button("🚀 Hantar Pesanan / Notifikasi", type="primary", use_container_width=True):
+                st.success(f"Pesanan untuk {d['Kaunter']} ({order_type}) berjaya diproses!")
                 if telegram_token and telegram_chat_id:
-                    msg = f"🚨 *TRADE TICKET ALERT* 🚨\nKaunter: {d['Kaunter']}\nJenis: {order_type}\nEntry: RM{d['Entry']}\nSL: RM{d['Stop-Loss']}\nTP: RM{d['Target Price']}\nUnit: {d['Lot_Unit']}"
+                    msg = f"🚨 *TRADE TICKET ALERT* 🚨\nKaunter: {d['Kaunter']}\nJenis: {order_type}\nEntry: RM{d['Entry (RM)']}\nSL: RM{d['Stop-Loss (RM)']}\nTP: RM{d['Target Price (TP)']}"
                     send_telegram_message(telegram_token, telegram_chat_id, msg)
                     st.info("Makluman berjaya dihantar ke Telegram!")
 
     st.markdown("---")
     csv_data = df_display.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_order_ticket.csv", mime="text/csv")
+    st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
 else:
     st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
-
-st.markdown("---")
-
-# --- 3. SEKSYEN REKOD SIMPANAN PELAN TRADE (TRADE HISTORY LOG) ---
-st.subheader("📁 Rekod Simpanan Pelan Trade (Saved Trades Log)")
-if st.session_state.trade_history:
-    history_df = pd.DataFrame(st.session_state.trade_history)
-    st.dataframe(history_df, use_container_width=True, hide_index=True)
-    
-    col_h1, col_h2 = st.columns(2)
-    with col_h1:
-        hist_csv = history_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Rekod Trade (CSV)", data=hist_csv, file_name="myx_trade_history.csv", mime="text/csv")
-    with col_h2:
-        if st.button("🗑️ Padam Semua Rekod"):
-            st.session_state.trade_history = []
-            st.rerun()
-else:
-    st.info("💡 Belum ada rekod trade yang disimpan. Sila pilih kaunter dan klik **'Hantar Pesanan / Simpan Pelan Trade'** di atas.")
