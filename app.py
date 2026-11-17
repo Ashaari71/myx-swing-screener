@@ -211,4 +211,27 @@ if st.session_state.scan_results:
 
     st.markdown("---")
     csv_data = pd.DataFrame(st.session_state.scan_results).to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_
+    st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_order_ticket.csv", mime="text/csv")
+else:
+    st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
+
+st.markdown("---")
+
+# --- PAPAN PENDAHUDU SEKTOR (SECTOR ROTATION) ---
+st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
+sector_perf = []
+for sec_name, t_list in sector_benchmarks.items():
+    sec_data = fetch_tradingview_scanner(t_list)
+    sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+    avg_ret = np.mean(sec_changes) if sec_changes else 0.0
+    status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah / Pullback")
+    sector_perf.append({
+        "Sektor Pasaran": sec_name,
+        "Avg Ret": avg_ret,
+        "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+        "Status Trend": status_trend
+    })
+
+if sector_perf:
+    perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
+    st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
