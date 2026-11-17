@@ -71,12 +71,14 @@ st.dataframe(perf_df, use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
-# --- SIDEBAR: TETAPAN & PENAPIS ---
+# --- SIDEBAR: TETAPAN & PENAPIS (DILETAK KOD KAUNTER DI ATAS SEBELAH KIRI) ---
 st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
+
 selected_sector = st.sidebar.selectbox("Pilih Sektor Untuk Imbasan:", list(sector_benchmarks.keys()))
 default_tickers = ", ".join(sector_benchmarks[selected_sector])
 
-ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=100)
+# Letak text_area di atas sekali dalam sidebar
+ticker_input = st.sidebar.text_area("Senarai Kod Kaunter (Boleh Edit):", value=default_tickers, height=120)
 
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.10, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI (Elak Overbought)", 70, 95, 95, 1)
@@ -164,7 +166,7 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                     else:
                         st.error("Gagal menghantar. Sila semak semula Token & Chat ID.")
             
-            # --- PAUTAN PANTAS TRADINGVIEW UNTUK SETIAP KAUNTER ---
+            # --- PAUTAN PANTAS TRADINGVIEW ---
             st.markdown("---")
             st.subheader("🔗 Pautan Pantas ke Carta Rasmi TradingView")
             st.markdown("Klik pautan di bawah untuk membuka carta rasmi kaunter di TradingView bagi melakukan lukisan (*drawing tools*) dan analisis terperinci:")
@@ -208,4 +210,4 @@ if st.sidebar.button("🚀 Mula Imbas Pasaran Live", type="primary"):
                 mime="text/csv",
             )
 else:
-    st.info("👈 Rujuk jadual prestasi sektor live di atas, masukkan senarai kod kaunter di sidebar, kemudian klik **Mula Imbas Pasaran Live**.")
+    st.info("👈 Kotak senarai kod kaunter kini berada di bahagian atas sidebar. Pilih sektor atau masukkan kaunter, kemudian klik **Mula Imbas Pasaran Live**.")
