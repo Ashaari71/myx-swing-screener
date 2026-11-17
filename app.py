@@ -18,14 +18,13 @@ st.markdown(
 )
 
 st.title(
-    "📈 MYX Swing Pro: Sector Rotation & Automated BOB/BOD Screener"
+    "📈 MYX Swing Pro: Automated BOB/BOD Screener & Sector Rotation"
 )
 st.markdown(
-    "Sistem Pemantauan Sektor Live & Imbasan Automatik Seluruh Pasaran Bursa"
-    " Malaysia"
+    "Sistem Imbasan Automatik Seluruh Pasaran Bursa & Pemantauan Sektor Live"
 )
 
-# --- SENARAI MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
+# --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
     "🔥 Pembinaan & Infrastruktur (Construction)": [
         "GAMUD",
@@ -69,17 +68,13 @@ sector_benchmarks = {
     ],
 }
 
-# Gabungkan semua kaunter untuk master screener automatik
 master_bursa_tickers = []
 for t_list in sector_benchmarks.values():
   master_bursa_tickers.extend(t_list)
-master_bursa_tickers = list(
-    set(master_bursa_tickers)
-)  # Buang duplikasi jika ada
+master_bursa_tickers = list(set(master_bursa_tickers))
+
 
 # --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
-
-
 def fetch_tradingview_scanner(tickers):
   formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
   url = "https://scanner.tradingview.com/malaysia/scan"
@@ -112,12 +107,12 @@ def fetch_tradingview_scanner(tickers):
 
 # --- SIDEBAR: TETAPAN LANJUTAN & PENAPIS ---
 st.sidebar.header("⚙️ Kriteria Tapisan (Screener Filters)")
-min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.15, step=0.05)
+min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
 max_rsi = st.sidebar.slider(
     "Had Maksimum RSI (Elak Overbought)", 70, 95, 80, 1
 )
 min_change_pct = st.sidebar.slider(
-    "Perubahan Harga Harian Minimum (%)", -2.0, 5.0, 0.0, 0.5
+    "Perubahan Harga Harian Minimum (%)", -5.0, 5.0, -2.0, 0.5
 )
 
 st.sidebar.markdown("---")
@@ -151,62 +146,25 @@ def send_telegram_message(token, chat_id, message):
 
 st.info(
     "🟢 **FBM KLCI: Live Market Aktif**   |   ✨ **Status"
-    " Live:** Sektor Rotation & Screener Aktif"
+    " Live:** Sistem Screener & Sektor Live Sedia"
 )
 
-# --- 1. PAPAN PENDAHUDU SEKTOR (SECTOR ROTATION LIVE) ---
-st.subheader(
-    "📊 Prestasi Sektor Semasa (Sector Leadership - Tersusun Ikut Kekuatan"
-    " Live)"
-)
-sector_perf = []
-
-for sec_name, t_list in sector_benchmarks.items():
-  sec_data = fetch_tradingview_scanner(t_list)
-  sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
-
-  if sec_changes:
-    avg_ret = np.mean(sec_changes)
-  else:
-    avg_ret = 0.0
-
-  if avg_ret > 0.5:
-    status_trend = "🔥 Sektor Leader (Uptrend Kuat)"
-  elif avg_ret >= 0:
-    status_trend = "📈 Positif Perlahan"
-  elif avg_ret >= -1.0:
-    status_trend = "📉 Pullback Sihat"
-  else:
-    status_trend = "⚠️ Lemah / Tekanan Jualan"
-
-  sector_perf.append({
-      "Sektor Pasaran": sec_name,
-      "Prestasi Purata": avg_ret,
-      "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-      "Status Trend Sektor": status_trend,
-  })
-
-if sector_perf:
-  perf_df = pd.DataFrame(sector_perf)
-  perf_df = perf_df.sort_values(by="Prestasi Purata", ascending=False)
-  display_df = perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend Sektor"]]
-  st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-st.markdown("---")
-
-# --- 2. PANEL KAWALAN IMBSAN AUTOMATIK SELURUH PASARAN ---
-st.markdown("### 🔍 Panel Imbasan Automatik Seluruh Pasaran Bursa")
+# --- 1. PANEL KAWALAN UTAMA DI ATAS SEKALI ---
+st.markdown("### 🚀 Panel Imbasan Automatik Seluruh Pasaran Bursa")
 st.markdown(
-    "Sistem akan mengimbas kesemua kaunter di atas secara serentak untuk"
-    " mencari setup **BOB / BOD** dan momentum positif."
+    "Klik butang di bawah untuk mengimbas kesemua kaunter utama secara"
+    " serentak mengikut syarat tapisan di sidebar."
 )
 
 run_scan = st.button(
-    "🚀 Mulakan Imbasan Automatik Seluruh Pasaran Sekarang",
+    "🔥 Mulakan Imbasan Automatik Sekarang",
     type="primary",
     use_container_width=True,
 )
 
+st.markdown("---")
+
+# --- 2. HASIL KEPUTUSAN IMBSAN (PAPARAN UTAMA) ---
 if run_scan:
   status_text = st.empty()
   status_text.text(
@@ -284,11 +242,6 @@ if run_scan:
     # --- PAUTAN PANTAS TRADINGVIEW ---
     st.markdown("---")
     st.subheader("🔗 Pautan Terus ke Carta Rasmi TradingView")
-    st.markdown(
-        "Klik pautan di bawah untuk melakukan analisis terperinci dan melukis"
-        " garisan (*drawing tools*) pada kaunter yang dikesan:"
-    )
-
     cols = st.columns(3)
     for i, t_name in enumerate(raw_tickers):
       tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
@@ -337,11 +290,50 @@ if run_scan:
   else:
     st.warning(
         "⚠️ Tiada kaunter yang melepasi kriteria tapisan semasa. Cuba longgarkan"
-        " sedikit tetapan RSI atau perubahan harga di sidebar."
+        " sedikit tetapan RSI atau harga di sidebar."
     )
 else:
   st.info(
-      "👈 Rujuk jadual prestasi sektor di atas untuk kenal pasti sektor paling"
-      " kuat, kemudian klik **Mulakan Imbasan Automatik Seluruh Pasaran"
-      " Sekarang**."
+      "👈 Klik butang **🔥 Mulakan Imbasan Automatik Sekarang** di atas untuk"
+      " memaparkan senarai kaunter."
   )
+
+st.markdown("---")
+
+# --- 3. PAPAN PENDAHUDU SEKTOR (DI BAWAHNYA) ---
+st.subheader(
+    "📊 Prestasi Sektor Semasa (Sector Leadership - Tersusun Ikut Kekuatan"
+    " Live)"
+)
+sector_perf = []
+
+for sec_name, t_list in sector_benchmarks.items():
+  sec_data = fetch_tradingview_scanner(t_list)
+  sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+
+  if sec_changes:
+    avg_ret = np.mean(sec_changes)
+  else:
+    avg_ret = 0.0
+
+  if avg_ret > 0.5:
+    status_trend = "🔥 Sektor Leader (Uptrend Kuat)"
+  elif avg_ret >= 0:
+    status_trend = "📈 Positif Perlahan"
+  elif avg_ret >= -1.0:
+    status_trend = "📉 Pullback Sihat"
+  else:
+    status_trend = "⚠️ Lemah / Tekanan Jualan"
+
+  sector_perf.append({
+      "Sektor Pasaran": sec_name,
+      "Prestasi Purata": avg_ret,
+      "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+      "Status Trend Sektor": status_trend,
+  })
+
+if sector_perf:
+  perf_df = pd.DataFrame(sector_perf)
+  perf_df = perf_df.sort_values(by="Prestasi Purata", ascending=False)
+  display_df = perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend Sektor"]]
+  st.dataframe(display_df, use_container_width=True, hide_index=True)
