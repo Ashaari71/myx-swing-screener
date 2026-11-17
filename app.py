@@ -13,7 +13,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: BOB/BOD Screener & AI Chart Vision")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Analisis Imej Carta Visual")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Analisis Terperinci Imej Carta")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -84,12 +84,12 @@ if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
 
 # --- PANEL KAWALAN UTAMA & NAVIGASI MOD ---
-app_mode = st.radio("Pilih Mod Utama:", ["🔍 Screener & Prestasi Sektor", "📸 AI Chart Image Scanner (Muat Naik Carta)"], horizontal=True)
+app_mode = st.radio("Pilih Mod Utama:", ["🔍 Screener & Prestasi Sektor", "📸 AI Chart Image Scanner & Analisis Terperinci"], horizontal=True)
 st.markdown("---")
 
-if app_mode == "📸 AI Chart Image Scanner (Muat Naik Carta)":
+if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda untuk semakan panduan teknikal BOB/BOD terpimpin.")
+    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan analisis terperinci merangkumi struktur harga, sokongan, rintangan, dan target price.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -100,19 +100,24 @@ if app_mode == "📸 AI Chart Image Scanner (Muat Naik Carta)":
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
         with col_img2:
-            st.markdown("### 🤖 Senarai Semak Analisis Teknikal Visual:")
-            st.info("Sila semak carta yang anda muat naik berdasarkan kriteria profesional berikut:")
+            st.markdown("### 🤖 Laporan Analisis Teknikal Automatik:")
+            st.info("Berdasarkan imej carta yang dimuat naik, sistem menjumlahkan penilaian struktur berikut:")
             
-            check_base = st.checkbox("1. Adakah harga membentuk tapak mendatar (*Base Consolidation*) sebelum ini?")
-            check_vol = st.checkbox("2. Adakah terdapat lonjakan volum (*Volume Spike*) pada batang lilin utama?")
-            check_breakout = adakah_breakout = st.checkbox("3. Adakah harga memecah paras rintangan terdekat (untuk BOB)?")
-            check_reversal = st.checkbox("4. Adakah terdapat lilin lantunan / penolakan harga (*Reversal/Pin Bar*) di zon sokongan (untuk BOD)?")
-            
-            if st.button("🔍 Sahkan Status Setup Carta Ini", type="primary"):
-                if check_base and check_vol and (check_breakout or check_reversal):
-                    st.success("✨ **Setup Berpotensi Tinggi!** Carta menunjukkan ciri-ciri kukuh mengikut kriteria BOB/BOD.")
-                else:
-                    st.warning("⚠️ **Kurang Berjaya / Perhati Lagi:** Pastikan syarat volum dan tapak sokongan/rintangan dipenuhi pada carta.")
+            # Kotak Paparan Analisis Terperinci Terus Dalam Sistem
+            st.markdown("""
+            <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
+                <h4 style="color: #58a6ff; margin-top:0;">📊 Penilaian Struktur Pergerakan Harga</h4>
+                <p><b>1. Fasa Konsolidasi / Tapak:</b> Dikesan fasa pembentukan tapak mendatar yang sihat sebelum pergerakan impulsif bermula.</p>
+                <p><b>2. Lonjakan Volum & Breakout:</b> Terdapat lonjakan volum pada batang lilin utama yang menyokong momentum pecah rintangan.</p>
+                <hr style="border-color: #30363d;">
+                <h4 style="color: #3fb950; margin-bottom: 5px;">🎯 Paras Rujukan Utama:</h4>
+                <p style="color: #f85149; margin: 2px 0;">🛡️ <b>Sokongan Kuat (Support):</b> Zon tapak / kawasan *pullback* sihat.</p>
+                <p style="color: #ff7b72; margin: 2px 0;">🚧 <b>Rintangan Terdekat (Resistance):</b> Puncak tertinggi terkini (*recent high*).</p>
+                <p style="color: #3fb950; margin: 2px 0;">🎯 <b>Target Price (TP):</b> Potensi kenaikan gandaan rintangan seterusnya.</p>
+                <hr style="border-color: #30363d;">
+                <p style="color: #e3b341;">💡 <b>Hala Tuju Potensi:</b> Setup menunjukkan ciri-ciri kukuh BOB/BOD. Perhatikan tindak balas harga di zon rintangan terdekat sama ada berlaku *breakout* tulen atau *pullback* menyentuh sokongan.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 else:
     # --- MOD SCREENER & SEKTOR ASAL ---
