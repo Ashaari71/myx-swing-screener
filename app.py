@@ -220,4 +220,43 @@ if st.session_state.scan_results:
     csv_data = df_display.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
 else:
-    st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
+    st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")import streamlit as st
+import pandas as pd
+import numpy as np
+import requests
+
+st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
+
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("📈 MYX Swing Pro: BOB & BOD Screener & Sector Live")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Pautan Pantas TradingView")
+
+# --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
+sector_benchmarks = {
+    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
+    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX"],
+    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
+    "🌾 Perladangan & Komoditi (Plantation)": ["KLK", "IOICORP", "FGV", "SIMEPROP"],
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"]
+}
+
+master_bursa_tickers = []
+for t_list in sector_benchmarks.values():
+    master_bursa_tickers.extend(t_list)
+master_bursa_tickers = list(set(master_bursa_tickers))
+
+# --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
+def fetch_tradingview_scanner(tickers):
+    formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
+    url = "https://scanner.tradingview.com/malaysia/scan"
+    payload = {
+        "symbols": {"tickers": formatted_symbols},
+        "columns": ["close", "change", "volume", "RSI"]
+    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win
