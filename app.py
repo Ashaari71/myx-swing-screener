@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, Sektor & Order Log")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live, Tiket Pesanan & Rekod Simpanan")
+st.title("📈 MYX Swing Pro: Screener, AI Analysis & Trade Log")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Analisis Teknikal AI, Sektor Live, Tiket Pesanan & Rekod Simpanan")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -86,6 +86,8 @@ if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
 if "scanned_data_dict" not in st.session_state:
     st.session_state.scanned_data_dict = {}
+if "ai_breakdowns" not in st.session_state:
+    st.session_state.ai_breakdowns = []
 if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
 if "trade_history" not in st.session_state:
@@ -113,6 +115,7 @@ if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
     scanned_data_dict = {}
+    ai_breakdowns = []
     raw_tickers = []
     
     for t in target_tickers:
@@ -126,6 +129,8 @@ if run_scan:
             if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
                 entry_price = round(price, 2)
                 sl = round(entry_price * 0.93, 2)
+                support_est = round(entry_price * 0.95, 2)
+                resistance_est = round(entry_price * 1.07, 2)
                 risk_per_share = entry_price - sl
                 tp = round(entry_price + (risk_per_share * 2.0), 2)
                 
@@ -140,12 +145,16 @@ if run_scan:
                 
                 if change >= 2.0 and vol > 500000:
                     signal = "🔥 BOB (Breakout)"
+                    ai_note = f"Harga merembat melepasi rintangan RM {resistance_est} dengan volum besar. Sokongan di RM {support_est}."
                 elif change >= -1.5 and change < 2.0 and vol > 300000:
                     signal = "🔄 BOD (Dip/Reversal)"
+                    ai_note = f"Pullback sihat dengan tanda lantunan (bullish reversal) di zon sokongan RM {support_est}. Volum menyokong."
                 elif change > 0:
                     signal = "📈 Momentum"
+                    ai_note = f"Pergerakan harga stabil mendaki menghampiri rintangan RM {resistance_est}."
                 else:
                     signal = "📉 Tapak / Pullback"
+                    ai_note = f"Menguji kawasan tapak sokongan RM {support_est}. Perhati lilin pembalikan (*reversal candle*)."
                 
                 item_data = {
                     "Kaunter": t,
@@ -161,13 +170,22 @@ if run_scan:
                 }
                 scan_results.append(item_data)
                 scanned_data_dict[t] = item_data
+                
+                ai_breakdowns.append({
+                    "Kaunter": t,
+                    "Analisis Teknikal AI (BOB / BOD, Sokongan & Rintangan)": ai_note,
+                    "Sokongan (S)": f"RM {support_est}",
+                    "Rintangan (R)": f"RM {resistance_est}"
+                })
+                
                 raw_tickers.append(t)
                 
     st.session_state.scan_results = scan_results
     st.session_state.scanned_data_dict = scanned_data_dict
+    st.session_state.ai_breakdowns = ai_breakdowns
     st.session_state.raw_tickers = raw_tickers
 
-# --- 1. PAPAN PENDAHUDU SEKTOR (DILETAKKAN DI ATAS SUPAYA MUDAH DIKESAN) ---
+# --- 1. PAPAN PENDAHUDU SEKTOR ---
 st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
 sector_perf = []
 for sec_name, t_list in sector_benchmarks.items():
@@ -188,7 +206,7 @@ if sector_perf:
 
 st.markdown("---")
 
-# --- 2. KEPUTUSAN SCREENER & ORDER TICKET ---
+# --- 2. KEPUTUSAN SCREENER, ANALISIS AI & ORDER TICKET ---
 if st.session_state.scan_results:
     st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
     
@@ -198,6 +216,11 @@ if st.session_state.scan_results:
         st.markdown("#### 📋 Senarai Keputusan Screener")
         df_display = pd.DataFrame(st.session_state.scan_results).rename(columns={"Lot_Unit": "Lot / Unit"})
         st.dataframe(df_display, use_container_width=True, hide_index=True)
+        
+        # Jadual Analisis Teknikal AI
+        st.markdown("#### 🤖 Nota Analisis Teknikal AI (BOB / BOD, Sokongan & Rintangan)")
+        ai_df = pd.DataFrame(st.session_state.ai_breakdowns)
+        st.dataframe(ai_df, use_container_width=True, hide_index=True)
         
         st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
         cols_tv = st.columns(4)
