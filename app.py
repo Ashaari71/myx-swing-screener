@@ -18,63 +18,70 @@ st.markdown(
 )
 
 st.title(
-    "📈 MYX Swing Pro: Automated BOB/BOD Screener (Main & ACE Market)"
+    "📈 MYX Swing Pro: Sector Rotation & Automated BOB/BOD Screener"
 )
 st.markdown(
-    "Sistem Imbasan Automatik Seluruh Pasaran Bursa, Pengesanan Teknik"
-    " BOB/BOD, Risiko & Telegram"
+    "Sistem Pemantauan Sektor Live & Imbasan Automatik Seluruh Pasaran Bursa"
+    " Malaysia"
 )
 
-# --- SENARAI INDUK MASTER KAUNTER BURSA MALAYSIA (MAIN & ACE) ---
-master_bursa_tickers = [
-    # Pembinaan & Infrastruktur
-    "GAMUD",
-    "SUNCON",
-    "IJM",
-    "MRCB",
-    "WCT",
-    "KERJAYA",
-    # Tenaga & RE / Utilities
-    "CITAGLB",
-    "SAMAIDEN",
-    "PEKAT",
-    "TENAGA",
-    "YTLPOWR",
-    "SOLARVEST",
-    "CHG",
-    # Teknologi & Semikonduktor
-    "FRONTKN",
-    "INARI",
-    "KGB",
-    "MYEG",
-    "UNISEM",
-    "GTRONIC",
-    "VITROX",
-    # Penjagaan Kesihatan
-    "KPJ",
-    "IHH",
-    "TOPGLOV",
-    "HARTA",
-    # Perladangan & Komoditi
-    "KLK",
-    "IOICORP",
-    "FGV",
-    "SIMEPROP",
-    # Perindustrian, Telco & Lain-lain
-    "CDB",
-    "MAXIS",
-    "SIME",
-    "PMETAL",
-    "ANCOMNY",
-    "WASCO",
-    "SCIENTX",
-]
+# --- SENARAI MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
+sector_benchmarks = {
+    "🔥 Pembinaan & Infrastruktur (Construction)": [
+        "GAMUD",
+        "SUNCON",
+        "IJM",
+        "MRCB",
+        "WCT",
+        "KERJAYA",
+    ],
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": [
+        "CITAGLB",
+        "SAMAIDEN",
+        "PEKAT",
+        "TENAGA",
+        "YTLPOWR",
+        "SOLARVEST",
+    ],
+    "💻 Teknologi & Semikonduktor (Tech)": [
+        "FRONTKN",
+        "INARI",
+        "KGB",
+        "MYEG",
+        "UNISEM",
+        "GTRONIC",
+        "VITROX",
+    ],
+    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
+    "🌾 Perladangan & Komoditi (Plantation)": [
+        "KLK",
+        "IOICORP",
+        "FGV",
+        "SIMEPROP",
+    ],
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": [
+        "CDB",
+        "MAXIS",
+        "SIME",
+        "PMETAL",
+        "ANCOMNY",
+        "WASCO",
+    ],
+}
+
+# Gabungkan semua kaunter untuk master screener automatik
+master_bursa_tickers = []
+for t_list in sector_benchmarks.values():
+  master_bursa_tickers.extend(t_list)
+master_bursa_tickers = list(
+    set(master_bursa_tickers)
+)  # Buang duplikasi jika ada
 
 # --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
 
 
 def fetch_tradingview_scanner(tickers):
-  formatted_symbols = [f"MYX:{t.strip()}" for t in tickers]
+  formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
   url = "https://scanner.tradingview.com/malaysia/scan"
   payload = {
       "symbols": {"tickers": formatted_symbols},
@@ -96,56 +103,12 @@ def fetch_tradingview_scanner(tickers):
             "rsi": (
                 vals[3] if len(vals) > 3 and vals[3] is not None else 50.0
             ),
-            "rec": (
-                vals[4] if len(vals) > 4 and vals[4] is not None else 0.0
-            ),
         }
       return results
   except Exception:
     pass
   return {}
 
-
-# --- KAWALAN UTAMA DI SKRIN UTAMA ---
-st.markdown("### 🔍 Panel Imbasan Automatik Seluruh Pasaran")
-st.markdown(
-    "Sistem akan mengimbas kesemua **kaunter terpilih utama di Bursa"
-    " Malaysia** secara serentak dan menapis setup **BOB / BOD** serta"
-    " momentum positif."
-)
-
-col_btn1, col_btn2 = st.columns([2, 1])
-with col_btn1:
-  scan_mode = st.radio(
-      "Mod Imbasan:",
-      [
-          "🤖 Imbas Automatik Penuh (Semua 35+ Kaunter Utama)",
-          "✍️ Imbas Kod Kaunter Manual Pilihan Sendiri",
-      ],
-      horizontal=True,
-  )
-
-if "Manual" in scan_mode:
-  manual_input = st.text_area(
-      "Masukkan Kod Kaunter (Pisahkan dengan koma):",
-      value="GAMUD, SUNCON, CITAGLB, SAMAIDEN, FRONTKN, MYEG",
-      height=70,
-  )
-  target_tickers = [
-      t.strip().upper().replace(".KL", "")
-      for t in manual_input.split(",")
-      if t.strip()
-  ]
-else:
-  target_tickers = master_bursa_tickers
-
-run_scan = st.button(
-    "🚀 Mulakan Imbasan Automatik Sekarang",
-    type="primary",
-    use_container_width=True,
-)
-
-st.markdown("---")
 
 # --- SIDEBAR: TETAPAN LANJUTAN & PENAPIS ---
 st.sidebar.header("⚙️ Kriteria Tapisan (Screener Filters)")
@@ -188,23 +151,76 @@ def send_telegram_message(token, chat_id, message):
 
 st.info(
     "🟢 **FBM KLCI: Live Market Aktif**   |   ✨ **Status"
-    " Live:** TradingView Screener Engine Ready"
+    " Live:** Sektor Rotation & Screener Aktif"
 )
 
-# --- PROSES IMBASAN AUTOMATIK ---
+# --- 1. PAPAN PENDAHUDU SEKTOR (SECTOR ROTATION LIVE) ---
+st.subheader(
+    "📊 Prestasi Sektor Semasa (Sector Leadership - Tersusun Ikut Kekuatan"
+    " Live)"
+)
+sector_perf = []
+
+for sec_name, t_list in sector_benchmarks.items():
+  sec_data = fetch_tradingview_scanner(t_list)
+  sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+
+  if sec_changes:
+    avg_ret = np.mean(sec_changes)
+  else:
+    avg_ret = 0.0
+
+  if avg_ret > 0.5:
+    status_trend = "🔥 Sektor Leader (Uptrend Kuat)"
+  elif avg_ret >= 0:
+    status_trend = "📈 Positif Perlahan"
+  elif avg_ret >= -1.0:
+    status_trend = "📉 Pullback Sihat"
+  else:
+    status_trend = "⚠️ Lemah / Tekanan Jualan"
+
+  sector_perf.append({
+      "Sektor Pasaran": sec_name,
+      "Prestasi Purata": avg_ret,
+      "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+      "Status Trend Sektor": status_trend,
+  })
+
+if sector_perf:
+  perf_df = pd.DataFrame(sector_perf)
+  perf_df = perf_df.sort_values(by="Prestasi Purata", ascending=False)
+  display_df = perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend Sektor"]]
+  st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
+# --- 2. PANEL KAWALAN IMBSAN AUTOMATIK SELURUH PASARAN ---
+st.markdown("### 🔍 Panel Imbasan Automatik Seluruh Pasaran Bursa")
+st.markdown(
+    "Sistem akan mengimbas kesemua kaunter di atas secara serentak untuk"
+    " mencari setup **BOB / BOD** dan momentum positif."
+)
+
+run_scan = st.button(
+    "🚀 Mulakan Imbasan Automatik Seluruh Pasaran Sekarang",
+    type="primary",
+    use_container_width=True,
+)
+
 if run_scan:
   status_text = st.empty()
   status_text.text(
-      f"Sedang mengimbas {len(target_tickers)} kaunter pasaran Malaysia..."
+      f"Sedang mengimbas {len(master_bursa_tickers)} kaunter utama Bursa"
+      " Malaysia..."
   )
 
-  tv_results = fetch_tradingview_scanner(target_tickers)
+  tv_results = fetch_tradingview_scanner(master_bursa_tickers)
   status_text.text("Imbasan selesai!")
 
   scan_results = []
   raw_tickers = []
 
-  for t in target_tickers:
+  for t in master_bursa_tickers:
     if t in tv_results:
       info = tv_results[t]
       price = info["close"]
@@ -212,13 +228,11 @@ if run_scan:
       rsi_val = info["rsi"]
       vol = info["volume"]
 
-      # Syarat Tapisan Automatik (Screener Logic)
       if (
           price >= min_price
           and rsi_val <= max_rsi
           and change >= min_change_pct
       ):
-        # Logik Pengesanan Teknikal BOB / BOD / Momentum
         if change > 2.0 and rsi_val > 55:
           signal = "🔥 BOB (Breakout of Base) + Momentum"
         elif change > 0 and rsi_val <= 55:
@@ -327,6 +341,7 @@ if run_scan:
     )
 else:
   st.info(
-      "👈 Pilih mod imbasan di atas, kemudian klik **Mulakan Imbasan Automatik"
-      " Sekarang** untuk menapis kesemua kaunter pasaran."
+      "👈 Rujuk jadual prestasi sektor di atas untuk kenal pasti sektor paling"
+      " kuat, kemudian klik **Mulakan Imbasan Automatik Seluruh Pasaran"
+      " Sekarang**."
   )
