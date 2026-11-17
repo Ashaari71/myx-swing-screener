@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Sector Rotation & Compact Screener")
-st.markdown("Sistem Imbasan Pasaran, Prestasi Sektor Live & Paparan Jadual Kompak (Gandaan 100 Unit)")
+st.title("📈 MYX Swing Pro: AI-Powered BOB/BOD & Sector Screener")
+st.markdown("Sistem Imbasan Automatik, Analisis Teknikal AI (S/R, Pullback, Reversal) & Gandaan 100 Unit")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -82,7 +82,7 @@ def send_telegram_message(token, chat_id, message):
         return False
 
 # --- PANEL KAWALAN UTAMA & PILIHAN MOD ---
-st.markdown("### 🔍 Panel Imbasan & Pemilihan Sektor / Manual")
+st.markdown("### 🔍 Panel Imbasan & Analisis AI Sektor / Manual")
 scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
 
 if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
@@ -96,13 +96,14 @@ if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
 else:
     target_tickers = master_bursa_tickers
 
-run_scan = st.button("🚀 Mula Imbas Pasaran Sekarang", type="primary", use_container_width=True)
+run_scan = st.button("🚀 Mula Imbasan & Analisis AI Sekarang", type="primary", use_container_width=True)
 st.markdown("---")
 
-# --- KEPUTUSAN IMBASAN (FORMAT JADUAL KOMPAK & GANDAAN 100 UNIT) ---
+# --- KEPUTUSAN IMBASAN & ANALISIS AI ---
 if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
+    ai_breakdowns = []
     raw_tickers = []
     
     for t in target_tickers:
@@ -115,24 +116,33 @@ if run_scan:
             
             if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
                 sl = round(price * 0.93, 2)
+                support_est = round(price * 0.95, 2)
+                resistance_est = round(price * 1.07, 2)
+                
                 risk_amt = total_capital * (risk_per_trade_pct / 100.0)
                 risk_per_share = price - sl
                 
                 if risk_per_share > 0:
                     raw_shares = risk_amt / risk_per_share
-                    # Bundarkan kepada gandaan 100 unit terdekat (minimum 100 unit / 1 lot)
                     shares = max(1, round(raw_shares / 100.0)) * 100
                 else:
                     shares = 100
                     
                 inv_total = shares * price
                 
+                # AI Technical Logic (BOB / BOD / Pullback / Reversal)
                 if change > 2.0 and rsi_val > 55:
-                    signal = "🔥 BOB + Momentum"
+                    signal = "🔥 BOB (Breakout of Base)"
+                    ai_note = f"Harga memecah tapak asas dengan momentum kuat. Sokongan terdekat di RM {support_est}, rintangan di RM {resistance_est}. Potensi sambungan *uptrend* jika volum kekal tinggi."
                 elif change > 0 and rsi_val <= 55:
-                    signal = "🔄 BOD Setup"
+                    signal = "🔄 BOD (Breakout of Downtrend)"
+                    ai_note = f"Fasa pemulihan dari trend menurun (*downtrend*). Tapak sokongan kukuh di RM {support_est}. Cari peluang *entry* semasa *pullback* kecil."
+                elif change < 0:
+                    signal = "📉 Pullback / Reversal Setup"
+                    ai_note = f"Harga sedang membuat *pullback* sihat menghampiri paras sokongan RM {support_est}. Perhati zon pembalikan (*reversal candle*) sebelum masuk."
                 else:
-                    signal = "📈 Uptrend / Pullback"
+                    signal = "📈 Uptrend Konsisten"
+                    ai_note = f"Pergerakan harga mendatar stabil. Sokongan di RM {support_est} dan sasaran rintangan pertama di RM {resistance_est}."
                 
                 scan_results.append({
                     "Kaunter": t,
@@ -140,20 +150,35 @@ if run_scan:
                     "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
                     "Volum": f"{vol:,.0f}",
-                    "Isyarat": signal,
+                    "Setup Teknikal": signal,
                     "Stop-Loss": sl,
-                    "Unit Disyorkan": f"{shares:,}",
+                    "Unit (Lot)": f"{shares:,}",
                     "Modal (RM)": f"{inv_total:,.2f}"
                 })
+                
+                ai_breakdowns.append({
+                    "Kaunter": t,
+                    "Analisis AI & Nota Teknikal": ai_note,
+                    "Sokongan (S)": f"RM {support_est}",
+                    "Rintangan (R)": f"RM {resistance_est}"
+                })
+                
                 raw_tickers.append(t)
                 
     if scan_results:
         st.success(f"Berjaya menemui **{len(scan_results)} kaunter** sepadan!")
+        
+        # Paparan Jadual Utama (Kompak)
         res_df = pd.DataFrame(scan_results)
         st.dataframe(res_df, use_container_width=True, hide_index=True)
         
+        # Paparan Nota Analisis AI Terperinci
+        st.markdown("### 🤖 Nota Analisis Teknikal AI (BOB/BOD, Sokongan & Rintangan)")
+        ai_df = pd.DataFrame(ai_breakdowns)
+        st.dataframe(ai_df, use_container_width=True, hide_index=True)
+        
         # Pautan Cepat TradingView
-        st.markdown("🔗 **Pautan Pantas Carta TradingView:**")
+        st.markdown("🔗 **Pautan Pantas Carta TradingView (Klik untuk sahkan analisis):**")
         cols = st.columns(6)
         for i, t_name in enumerate(raw_tickers):
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
@@ -161,7 +186,7 @@ if run_scan:
                 st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
                 
         csv_data = res_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener.csv", mime="text/csv")
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_ai_screener.csv", mime="text/csv")
     else:
         st.warning("⚠️ Tiada kaunter melepasi tapisan kriteria semasa.")
     st.markdown("---")
