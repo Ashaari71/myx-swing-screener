@@ -13,7 +13,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Screener, AI Chart Vision & Pautan Rasmi")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Rujukan Pantas Bursa / CGS-iTrade")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Rujukan Pantas Bursa / KLSE")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -90,31 +90,33 @@ app_mode = st.radio(
     [
         "🔍 Screener & Prestasi Sektor", 
         "📸 AI Chart Image Scanner & Analisis Terperinci", 
-        "🔗 Pautan Pantas Data Rasmi (Bursa & CGS-iTrade)"
+        "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)"
     ], 
     horizontal=True
 )
 st.markdown("---")
 
-if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & CGS-iTrade)":
+if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
     st.subheader("🔗 Rujukan Pantas Data Rasmi Pasaran")
-    st.markdown("Masukkan kod kaunter Bursa Malaysia pilihan anda untuk terus merujuk data sahih di platform rasmi.")[cite: 11]
+    st.markdown("Masukkan kod kaunter Bursa Malaysia pilihan anda untuk terus merujuk data sahih di platform rasmi.")
     
     col_lk1, col_lk2 = st.columns([1, 1])
     with col_lk1:
-        ticker_input = st.text_input("Masukkan Kod Kaunter (Cth: HARTA, SAMAIDEN, SUNCON, GAMUD):", value="HARTA").upper().strip()[cite: 11]
+        ticker_input = st.text_input("Masukkan Kod Kaunter (Cth: HARTA, SAMAIDEN, SUNCON, GAMUD):", value="HARTA").upper().strip()
     
     if ticker_input:
         bursa_url = f"https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code={ticker_input}"
-        cgstrade_url = f"https://www.itradecgs.com.my/"
+        cgstrade_url = "https://www.itradecgs.com.my/"
+        klsescreener_url = f"https://www.klsescreener.com/v2/stocks/view/{ticker_input}"
         
         st.markdown(f"""
         <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d;">
             <h3 style="color: #58a6ff; margin-top:0;">📌 Pautan Pantas untuk Kaunter: {ticker_input}</h3>
             <p>Klik pautan di bawah untuk membuka halaman rasmi:</p>
             <ul>
-                <li>👉 <a href="{bursa_url}" target="_blank"><b>Semak Profil & Laporan di Bursa Malaysia Rasmi</b></a>[cite: 11]</li>
-                <li>👉 <a href="{cgstrade_url}" target="_blank"><b>Buka Portal CGS-CIMB iTrade (KLSE)</b></a>[cite: 11]</li>
+                <li>👉 <a href="{bursa_url}" target="_blank"><b>Semak Profil & Laporan di Bursa Malaysia Rasmi</b></a></li>
+                <li>👉 <a href="{klsescreener_url}" target="_blank"><b>Buka Analisis Kaunter di KLSE Screener</b></a></li>
+                <li>👉 <a href="{cgstrade_url}" target="_blank"><b>Buka Portal CGS-CIMB iTrade (KLSE)</b></a></li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
