@@ -190,6 +190,7 @@ else:
         tv_results = fetch_tradingview_scanner(target_tickers)
         scan_results = []
         raw_tickers = []
+        alert_messages = []
         
         for t in target_tickers:
             if t in tv_results:
@@ -221,12 +222,19 @@ else:
                     scan_results.append(item_data)
                     raw_tickers.append(t)
                     
+                    # Kumpul senarai kaunter yang berpotensi entry untuk mesej Telegram
+                    if "BOB" in signal or "BOD" in signal:
+                        alert_messages.append(f"• *{t}* | Harga: RM {entry_price} | Setup: {signal} | Vol: {vol:,.0f}")
+                    
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
         
-        if scan_results and telegram_token and telegram_chat_id:
-            msg = f"🚨 *MYX SCREENER ALERT* 🚨\nBerjaya mengesan {len(scan_results)} kaunter sepadan dengan kriteria BOB/BOD."
-            send_telegram_message(telegram_token, telegram_chat_id, msg)
+        # Hantar mesej alert auto ke Telegram sekiranya ada setup entry dikesan
+        if alert_messages and telegram_token and telegram_chat_id:
+            full_msg = f"🚨 *MYX SWING ENTRY ALERT* 🚨\nSistem mengesan kaunter berpotensi tinggi:\n" + "\n".join(alert_messages)
+            success = send_telegram_message(telegram_token, telegram_chat_id, full_msg)
+            if success:
+                st.toast("✅ Alert setup entry berjaya dihantar ke Telegram anda!", icon="🚀")
 
     # --- PAPAN PENDAHUDU SEKTOR ---
     st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
