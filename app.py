@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
-import yfinance as yf
 from PIL import Image
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
@@ -13,7 +12,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Technical, AI Vision & Live FA")
+st.title("📈 MYX Swing Pro: Screener, AI Chart Vision & Pautan Rasmi")
 st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Rujukan Pantas Bursa / Pick@Stock")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
@@ -60,66 +59,6 @@ def fetch_tradingview_scanner(tickers):
         pass
     return {}
 
-# --- FUNGSI ANALISIS FUNDAMENTAL YFINANCE ---
-def analyze_fundamental(ticker_symbol):
-    clean_symbol = ticker_symbol.strip().upper().replace('.KL', '')
-    yf_symbol = f"{clean_symbol}.KL"
-    
-    try:
-        stock = yf.Ticker(yf_symbol)
-        info = stock.info
-        
-        market_cap = info.get("marketCap", 0)
-        pe_ratio = info.get("trailingPE", "N/A")
-        roe = info.get("returnOnEquity", None)
-        earnings_growth = info.get("earningsQuarterlyGrowth", None)
-        long_name = info.get("longName", clean_symbol)
-        sector = info.get("sector", "Bursa Malaysia Equities")
-        
-        score = 0
-        details = []
-        
-        if earnings_growth is not None and earnings_growth > 0.15:
-            score += 2
-            details.append("✅ **C & A (Earnings Growth):** Pertumbuhan pendapatan suku tahunan kukuh (>15%).")
-        elif earnings_growth is not None and earnings_growth > 0:
-            score += 1
-            details.append("⚠️ **C & A (Earnings Growth):** Pertumbuhan pendapatan positif tetapi sederhana.")
-        else:
-            details.append("❌ **C & A (Earnings Growth):** Tiada data pertumbuhan positif yang ketara dalam sistem.")
-            
-        if market_cap and market_cap > 500000000:
-            score += 1
-            details.append("✅ **S (Market Cap):** Syarikat berkapitalisasi pasaran stabil.")
-        else:
-            details.append("⚠️ **S (Market Cap):** Kapitalisasi kecil / data terhad.")
-            
-        if roe is not None and roe > 0.10:
-            score += 2
-            details.append(f"✅ **L (ROE):** Pulangan atas ekuiti sihat pada {(roe*100):.1f}%.")
-        else:
-            score += 1
-            details.append("⚠️ **L (ROE):** ROE sederhana atau tidak cukup data.")
-            
-        if pe_ratio != "N/A" and isinstance(pe_ratio, (int, float)) and 5 < pe_ratio < 30:
-            score += 2
-            details.append(f"✅ **M (Valuation P/E):** Nisbah P/E munasabah ({pe_ratio:.1f}x).")
-        else:
-            score += 1
-            details.append("⚠️ **M (Valuation P/E):** P/E tinggi atau tiada rekod nisbah semasa.")
-            
-        return {
-            "name": long_name,
-            "sector": sector,
-            "market_cap": f"RM {market_cap:,.0f}" if market_cap else "Rujuk Portal Rasmi",
-            "pe_ratio": f"{pe_ratio:.1f}x" if isinstance(pe_ratio, (int, float)) else "N/A",
-            "score": min(7, max(3, score)),
-            "details": details,
-            "valid": True
-        }
-    except Exception as e:
-        return {"valid": False, "error": str(e)}
-
 # --- SIDEBAR TETAPAN ---
 st.sidebar.header("⚙️ Kriteria Tapisan")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
@@ -151,63 +90,36 @@ app_mode = st.radio(
     [
         "🔍 Screener & Prestasi Sektor", 
         "📸 AI Chart Image Scanner & Analisis Terperinci", 
-        "📊 Analisis Fundamental & Pautan Rasmi"
+        "🔗 Pautan Pantas Data Rasmi (Bursa & Pick@Stock)"
     ], 
     horizontal=True
 )
 st.markdown("---")
 
-if app_mode == "📊 Analisis Fundamental & Pautan Rasmi":
-    st.subheader("📊 Modul Semakan Fundamental & Rujukan Sumber Rasmi")
-    st.markdown("Masukkan kod kaunter. Sistem menyertakan **pautan pantas terus ke Pick@Stock dan Bursa Malaysia** untuk semakan data rasmi yang dijamin tepat.")
+if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & Pick@Stock)":
+    st.subheader("🔗 Rujukan Pantas Data Rasmi Pasaran")
+    st.markdown("Masukkan kod kaunter Bursa Malaysia pilihan anda untuk terus merujuk data sahih di platform rasmi.")
     
-    col_fa1, col_fa2 = st.columns([1, 1])
+    col_lk1, col_lk2 = st.columns([1, 1])
+    with col_lk1:
+        ticker_input = st.text_input("Masukkan Kod Kaunter (Cth: SAMAIDEN, SUNCON, GAMUD):", value="SAMAIDEN").upper().strip()
     
-    with col_fa1:
-        fa_ticker = st.text_input("Masukkan Kod Kaunter Bursa (Cth: SAMAIDEN, SUNCON, GAMUD):", value="SAMAIDEN").upper().strip()
-        evaluate_fa = st.button("🚀 Semak Data & Sumber Rasmi", type="primary", use_container_width=True)
+    if ticker_input:
+        bursa_url = f"https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code={ticker_input}"
+        pickatstock_url = "https://www.pickatstock.com/"
+        tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{ticker_input}"
         
-        if fa_ticker:
-            st.markdown("---")
-            st.markdown("🔗 **Pautan Semakan Pantas Luaran (Data Rasmi):**")
-            bursa_search_url = f"https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code={fa_ticker}"
-            pickatstock_url = f"https://www.pickatstock.com/"
-            
-            st.markdown(f"👉 **[Semak di Bursa Malaysia Rasmi]({bursa_search_url})**", unsafe_allow_html=True)
-            st.markdown(f"👉 **[Buka Laman Pick@Stock]({pickatstock_url})**", unsafe_allow_html=True)
-
-    with col_fa2:
-        st.markdown(f"### 📑 Laporan FA: **{fa_ticker}**")
-        if evaluate_fa:
-            with st.spinner("Menarik data kewangan..."):
-                fa_data = analyze_fundamental(fa_ticker)
-                
-            if fa_data["valid"]:
-                score = fa_data["score"]
-                score_pct = (score / 7) * 100
-                
-                st.markdown(f"""
-                <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
-                    <h3 style="color: #58a6ff; margin-top:0;">{fa_data['name']}</h3>
-                    <p><b>Sektor:</b> {fa_data['sector']}</p>
-                    <p><b>Market Cap:</b> {fa_data['market_cap']}</p>
-                    <p><b>Nisbah P/E:</b> {fa_data['pe_ratio']}</p>
-                    <hr style="border-color: #30363d;">
-                    <h4 style="color: #e3b341; margin-top:0;">Skor Anggaran CANSLIM: {score} / 7 ({score_pct:.0f}%)</h4>
-                """, unsafe_allow_html=True)
-                
-                for detail in fa_data["details"]:
-                    st.markdown(f"- {detail}")
-                    
-                st.markdown("""
-                    <hr style="border-color: #30363d;">
-                    <p style="color: #58a6ff;">💡 <b>Nota:</b> Sekiranya data kelihatan terhad, sila gunakan pautan pantas di sebelah kiri untuk menyemak angka rasmi terkini di portal Bursa Malaysia atau Pick@Stock.</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.error(f"Gagal mengambil data automatik untuk **{fa_ticker}**. Sila rujuk terus pautan rasmi Bursa Malaysia di sebelah kiri.")
-        else:
-            st.info("👈 Masukkan kod kaunter dan klik butang di sebelah kiri.")
+        st.markdown(f"""
+        <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d;">
+            <h3 style="color: #58a6ff; margin-top:0;">📌 Pautan Pantas untuk Kaunter: {ticker_input}</h3>
+            <p>Klik pautan di bawah untuk membuka halaman rasmi dan menyemak data fundamental sebenar:</p>
+            <ul>
+                <li>👉 <a href="{bursa_url}" target="_blank"><b>Semak Profil & Laporan di Bursa Malaysia Rasmi</b></a></li>
+                <li>👉 <a href="{pickatstock_url}" target="_blank"><b>Buka Portal Pick@Stock</b></a></li>
+                <li>👉 <a href="{tv_url}" target="_blank"><b>Buka Carta Live di TradingView (MYX:{ticker_input})</b></a></li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
 
 elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
