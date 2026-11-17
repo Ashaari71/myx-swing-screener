@@ -12,8 +12,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: BOB/BOD Screener & AI Chart Vision")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Analisis Trend Sokongan/Rintangan")
+st.title("📈 MYX Swing Pro: Technical, AI Vision & Fundamental Analysis")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Modul Semakan Analisis Fundamental (FA)")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -83,11 +83,70 @@ if "scan_results" not in st.session_state:
 if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
 
-# --- PANEL KAWALAN UTAMA & NAVIGASI MOD ---
-app_mode = st.radio("Pilih Mod Utama:", ["🔍 Screener & Prestasi Sektor", "📸 AI Chart Image Scanner & Analisis Terperinci"], horizontal=True)
+# --- NAVIGASI MOD UTAMA (3 MOD: Screener, AI Chart Vision, Analisis Fundamental) ---
+app_mode = st.radio(
+    "Pilih Mod Utama Sistem:", 
+    [
+        "🔍 Screener & Prestasi Sektor", 
+        "📸 AI Chart Image Scanner & Analisis Terperinci", 
+        "📊 Analisis Fundamental (FA & CANSLIM Checklist)"
+    ], 
+    horizontal=True
+)
 st.markdown("---")
 
-if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
+if app_mode == "📊 Analisis Fundamental (FA & CANSLIM Checklist)":
+    st.subheader("📊 Modul Semakan Analisis Fundamental & Kriteria CANSLIM")
+    st.markdown("Gunakan senarai semak interaktif ini untuk menilai kekuatan fundamental syarikat sebelum membuat keputusan dagangan swing.")
+    
+    col_fa1, col_fa2 = st.columns([1, 1])
+    
+    with col_fa1:
+        fa_ticker = st.text_input("Masukkan Nama / Kod Kaunter (Cth: GAMUD, SUNCON, KLK):", value="GAMUD").upper()
+        fa_sector = st.selectbox("Pilih Sektor Syarikat:", list(sector_benchmarks.keys()))
+        
+        st.markdown("#### 📋 Senarai Semak Kriteria CANSLIM & Kewangan:")
+        c_check = st.checkbox("C - Current Earnings: Pendapatan suku tahunan terkini meningkat kuat (>20% YoY)?")
+        a_check = st.checkbox("A - Annual Earnings: Pertumbuhan keuntungan tahunan konsisten kebelakangan ini?")
+        n_check = st.checkbox("N - New Catalyst: Ada produk baharu, kontrak besar, atau pengurusan baharu?")
+        s_check = st.checkbox("S - Supply & Demand: Permintaan belian tinggi & struktur saham sihat?")
+        l_check = st.checkbox("L - Leader in Sector: Merupakan syarikat pemimpin (*Sector Leader*)?")
+        i_check = st.checkbox("I - Institutional Support: Disokong oleh dana institusi / pemegang saham besar?")
+        m_check = st.checkbox("M - Market Direction: Arah pasaran keseluruhan (*Bursa Malaysia*) menyokong?")
+        
+        evaluate_fa = st.button("🔍 Nilaikan Skor Fundamental", type="primary")
+
+    with col_fa2:
+        st.markdown(f"### 📑 Laporan Analisis Fundamental: **{fa_ticker}**")
+        if evaluate_fa:
+            score = sum([c_check, a_check, n_check, s_check, l_check, i_check, m_check])
+            score_pct = (score / 7) * 100
+            
+            if score >= 6:
+                status_fa = "🌟 Cemerlang (A+ Fundamental Setup)"
+                color_code = "#3fb950"
+            elif score >= 4:
+                status_fa = "👍 Sederhana Kukuh (Layak Diperhati)"
+                color_code = "#e3b341"
+            else:
+                status_fa = "⚠️ Lemah / Kurang Berkualiti"
+                color_code = "#f85149"
+                
+            st.markdown(f"""
+            <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
+                <h4 style="color: {color_code}; margin-top:0;">Skor Pematuhan: {score} / 7 ({score_pct:.0f}%)</h4>
+                <p><b>Status Penilaian:</b> {status_fa}</p>
+                <hr style="border-color: #30363d;">
+                <p><b>Sektor Pilihan:</b> {fa_sector}</p>
+                <p><b>Kriteria Terpenuhi:</b> {score} daripada 7 elemen asas pelaburan bernilai/swing.</p>
+                <hr style="border-color: #30363d;">
+                <p style="color: #58a6ff;">💡 <b>Nota Analisis:</b> Gabungkan skor fundamental yang tinggi ini bersama setup teknikal BOB/BOD yang jitu untuk mendapatkan kebarangkalian kejayaan trade yang optimum di Bursa Malaysia.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("👈 Sila tanda senarai semak di sebelah kiri dan klik butang **Nilaikan Skor Fundamental**.")
+
+elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
     st.markdown("Muat naik *screenshot* carta TradingView anda, pilih status trend, dan lihat paparan rujukan harga Sokongan, Rintangan, serta Target Price.")
     
@@ -102,16 +161,13 @@ if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
         with col_img2:
             st.markdown("### 🤖 Laporan Analisis Teknikal Automatik:")
             
-            # Pilihan Status Trend (Uptrend / Downtrend / Sideway)
             selected_trend = st.selectbox(
                 "📈 Tentukan Status Trend Semasa Carta:",
                 ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan / Tekanan Jualan)", "⚖️ Sideway (Fasa Tapak / Mendatar Konsolidasi)"]
             )
             
-            # Input anggaran harga semasa carta yang dimuat naik untuk pengiraan S/R dinamik
             est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
             
-            # Logik pengiraan rujukan harga berasaskan trend dan harga semasa
             if "Uptrend" in selected_trend:
                 sokongan_kuat = round(est_current_price * 0.88, 2)
                 sokongan_terdekat = round(est_current_price * 0.94, 2)
@@ -131,7 +187,6 @@ if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
                 target_price = round(est_current_price * 1.12, 2)
                 trend_desc = "Harga bergerak mendatar (*consolidation base*), bersedia mengumpul tenaga untuk arah seterusnya."
 
-            # Kotak Paparan Analisis Terperinci Nilai Harga & Trend
             st.markdown(f"""
             <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
                 <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis & Struktur Trend</h4>
