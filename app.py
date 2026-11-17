@@ -146,7 +146,7 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
 
 elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan rujukan harga Sokongan, Rintangan, Target Price serta Pandangan AI yang Dinamik.")
+    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan struktur harga dan rumusan analisis AI yang padu.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -157,69 +157,57 @@ elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
         with col_img2:
-            st.markdown("### 🤖 Laporan Analisis & Pandangan AI:")
+            st.markdown("### 🤖 Rumusan Taktikal & Analisis Padu AI:")
             selected_trend = st.selectbox(
                 "📈 Tentukan Status Trend Semasa Carta:",
                 ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan / Tekanan Jualan)", "⚖️ Sideway (Fasa Tapak / Mendatar Konsolidasi)"]
             )
             est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
             
-            # Dinamik pengiraan paras rujukan berdasarkan input harga
+            # Pengiraan paras rujukan yang sepadan
             if "Uptrend" in selected_trend:
                 sokongan_kuat = round(est_current_price * 0.88, 2)
                 sokongan_terdekat = round(est_current_price * 0.94, 2)
                 rintangan_terdekat = round(est_current_price * 1.06, 2)
                 target_price = round(est_current_price * 1.15, 2)
-                trend_desc = "Struktur harga membentuk Higher Highs & Higher Lows yang sihat dengan momentum pembeli yang aktif."
                 
-                # Variasi pandangan AI secara rawak supaya tidak berulang
-                uptrend_advs = [
-                    "✨ **Pandangan AI:** Momentum kenaikan kukuh. Fokus kepada strategi *Buy on Dip* apabila harga membuat *pullback* ringan ke zon sokongan terdekat sebelum menyambung kenaikan.",
-                    "🚀 **Pandangan AI:** Harga sedang menguji zon rintangan. Pastikan breakout disokong oleh lonjakan volum harian yang ketara bagi mengelakkan perangkap *fake breakout*.",
-                    "🔥 **Pandangan AI:** Setup pasaran sangat sihat untuk swing trading. Letakkan trailing stop-loss di bawah sokongan terdekat untuk melindungi keuntungan semasa."
-                ]
-                ai_advice = np.random.choice(uptrend_advs)
-                
+                cohesive_comment = f"""
+                <b>Analisis Menyeluruh:</b> Pergerakan carta semasa berada dalam fasa <b>Uptrend</b> yang sihat pada harga RM {est_current_price:.2f}. Struktur pasaran menunjukkan momentum pembeli masih menguasai keadaan. 
+                <br><br>
+                <b>Pelan Taktikal:</b> Anda boleh merancang kemasukan (*entry*) sekiranya berlaku penurunan sihat (*pullback*) menghampiri zon <b>Sokongan Terdekat di RM {sokongan_terdekat}</b>, atau menunggu pengesahan pecah rintangan (*breakout*) di atas <b>RM {rintangan_terdekat}</b> dengan sokongan volum tinggi. Letakkan benteng pertahanan (*stop-loss*) di bawah paras <b>Sokongan Kuat RM {sokongan_kuat}</b> dan sasarkan keuntungan di <b>RM {target_price}</b>.
+                """
             elif "Downtrend" in selected_trend:
                 sokongan_kuat = round(est_current_price * 0.80, 2)
                 sokongan_terdekat = round(est_current_price * 0.90, 2)
                 rintangan_terdekat = round(est_current_price * 1.03, 2)
                 target_price = round(est_current_price * 1.10, 2)
-                trend_desc = "Tekanan jualan menguasai carta; harga berada di bawah purata pergerakan utama."
                 
-                downtrend_advs = [
-                    "⚠️ **Pandangan AI:** Elakkan tangkap pisau jatuh (*catching falling knives*). Tunggu sehingga muncul batang lilin pembalikan (*reversal candle*) yang jelas di zon sokongan kuat.",
-                    "📉 **Pandangan AI:** Sentimen pasaran lemah. Adalah lebih selamat untuk kekal *cash* atau tunggu pembentukan tapak penumpukan baharu sebelum merancang sebarang kemasukan.",
-                    "🛡️ **Pandangan AI:** Sekiranya sudah memegang posisi, ketatkan disiplin *stop-loss* di bawah sokongan kuat untuk mengehadkan risiko kerugian modal."
-                ]
-                ai_advice = np.random.choice(downtrend_advs)
-                
+                cohesive_comment = f"""
+                <b>Analisis Menyeluruh:</b> Carta menunjukkan fasa <b>Downtrend</b> di mana tekanan jualan masih menguasai struktur harga di sekitar RM {est_current_price:.2f}. Risiko penurunan lanjutan adalah tinggi selagi tiada tanda pembalikan arah.
+                <br><br>
+                <b>Pelan Taktikal:</b> Elakkan daripada membeli secara melulu (*catching falling knives*). Tunggu sehingga harga menguji zon <b>Sokongan Terdekat RM {sokongan_terdekat}</b> atau <b>Sokongan Kuat RM {sokongan_kuat}</b> dan pastikan wujud lilin lantunan (*reversal candlestick*) berserta volum besar sebelum mempertimbangkan sebarang risiko pembelian.
+                """
             else:
                 sokongan_kuat = round(est_current_price * 0.85, 2)
                 sokongan_terdekat = round(est_current_price * 0.93, 2)
                 rintangan_terdekat = round(est_current_price * 1.05, 2)
                 target_price = round(est_current_price * 1.12, 2)
-                trend_desc = "Harga bergerak mendatar (fasa konsolidasi tapak), membina tenaga sebelum arah seterusnya."
                 
-                sideway_advs = [
-                    "💡 **Pandangan AI:** Fasa pengumpulan (*accumulation*) yang baik. Perhatikan aktiviti volum; volum rendah ketika susut harga menunjukkan tekanan jual mula mereda.",
-                    "⚖️ **Pandangan AI:** Sediakan amaran harga (*price alert*) di paras rintangan terdekat. Masuk apabila berlaku pemecahan rintangan disertai lonjakan volum dagangan.",
-                    "🔍 **Pandangan AI:** Pasaran sedang berehat. Peluang bagus untuk melakukan kajian asas syarikat sementara menunggu isyarat breakout rasmi."
-                ]
-                ai_advice = np.random.choice(sideway_advs)
+                cohesive_comment = f"""
+                <b>Analisis Menyeluruh:</b> Harga semasa RM {est_current_price:.2f} bergerak dalam fasa <b>Sideway (Konsolidasi Tapak)</b>, menunjukkan proses pengumpulan tenaga oleh pelabur besar sebelum arah pasaran seterusnya ditentukan.
+                <br><br>
+                <b>Pelan Taktikal:</b> Fasa ini sesuai untuk pemantauan rapi (*watchlist*). Sediakan amaran harga berhampiran <b>Rintangan Terdekat RM {rintangan_terdekat}</b>. Masuk posisi beli sekiranya berlaku lonjakan volum ketara memecahkan rintangan tersebut, dengan kawalan risiko ketat di bawah <b>Sokongan Terdekat RM {sokongan_terdekat}</b>.
+                """
 
             st.markdown(f"""
-            <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
-                <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis & Struktur Trend</h4>
-                <p><b>Status Trend:</b> <span style="color: #e3b341;">{selected_trend}</span></p>
-                <p><b>Huraian:</b> {trend_desc}</p>
+            <div style="background-color: #161b22; padding: 22px; border-radius: 10px; border: 1px solid #30363d;">
+                <h4 style="color: #58a6ff; margin-top:0;">📊 Rumusan & Pelan Taktikal AI</h4>
+                <p style="color: #f85149; margin: 3px 0;">🛡️ <b>Sokongan Kuat (Stop-Loss):</b> <b>RM {sokongan_kuat}</b></p>
+                <p style="color: #ff7b72; margin: 3px 0;">📉 <b>Sokongan Terdekat:</b> <b>RM {sokongan_terdekat}</b></p>
+                <p style="color: #ffa657; margin: 3px 0;">🚧 <b>Rintangan Terdekat:</b> <b>RM {rintangan_terdekat}</b></p>
+                <p style="color: #3fb950; margin: 3px 0;">🎯 <b>Target Price (TP):</b> <b>RM {target_price}</b></p>
                 <hr style="border-color: #30363d;">
-                <p style="color: #f85149; margin: 2px 0;">🛡️ <b>Sokongan Kuat (Stop-Loss):</b> <b>RM {sokongan_kuat}</b></p>
-                <p style="color: #ff7b72; margin: 2px 0;">📉 <b>Sokongan Terdekat:</b> <b>RM {sokongan_terdekat}</b></p>
-                <p style="color: #ffa657; margin: 2px 0;">🚧 <b>Rintangan Terdekat:</b> <b>RM {rintangan_terdekat}</b></p>
-                <p style="color: #3fb950; margin: 2px 0;">🎯 <b>Target Price (TP):</b> <b>RM {target_price}</b></p>
-                <hr style="border-color: #30363d;">
-                <p style="color: #58a6ff;">{ai_advice}</p>
+                <p style="color: #c9d1d9; line-height: 1.5; margin-bottom: 0;">{cohesive_comment}</p>
             </div>
             """, unsafe_allow_html=True)
 
