@@ -113,7 +113,7 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
 
 elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan rujukan harga Sokongan, Rintangan, serta Target Price.")
+    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan rujukan harga Sokongan, Rintangan, Target Price serta Cadangan & Pandangan AI.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -124,7 +124,7 @@ elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
         with col_img2:
-            st.markdown("### 🤖 Laporan Analisis Teknikal Automatik:")
+            st.markdown("### 🤖 Laporan Analisis & Pandangan AI:")
             selected_trend = st.selectbox(
                 "📈 Tentukan Status Trend Semasa Carta:",
                 ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan / Tekanan Jualan)", "⚖️ Sideway (Fasa Tapak / Mendatar Konsolidasi)"]
@@ -136,29 +136,35 @@ elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
                 sokongan_terdekat = round(est_current_price * 0.94, 2)
                 rintangan_terdekat = round(est_current_price * 1.06, 2)
                 target_price = round(est_current_price * 1.15, 2)
-                trend_desc = "Harga bergerak dalam struktur kenaikan sihat."
+                trend_desc = "Harga bergerak dalam struktur kenaikan sihat (*Higher Highs & Higher Lows*)."
+                ai_advice = "✨ **Pandangan AI:** Momentum pembeli masih mendominasi pasaran. Cadangan strategi adalah tunggu *pullback* sihat berhampiran zon Sokongan Terdekat atau tunggu pengesahan *breakout* volum tinggi di paras Rintangan Terdekat sebelum masuk posisi."
             elif "Downtrend" in selected_trend:
                 sokongan_kuat = round(est_current_price * 0.80, 2)
                 sokongan_terdekat = round(est_current_price * 0.90, 2)
                 rintangan_terdekat = round(est_current_price * 1.03, 2)
                 target_price = round(est_current_price * 1.10, 2)
-                trend_desc = "Harga di bawah tekanan jual."
+                trend_desc = "Harga di bawah tekanan jual; struktur pasaran menunjukkan kelemahan."
+                ai_advice = "⚠️ **Pandangan AI:** Elakkan daripada membeli secara melulu (*catching falling knives*). Tunggu sehingga harga berjaya membentuk tapak pengumpulan (*consolidation base*) dan lilin pembalikan (*reversal candle*) berserta volum besar di zon sokongan."
             else:
                 sokongan_kuat = round(est_current_price * 0.85, 2)
                 sokongan_terdekat = round(est_current_price * 0.93, 2)
                 rintangan_terdekat = round(est_current_price * 1.05, 2)
                 target_price = round(est_current_price * 1.12, 2)
-                trend_desc = "Harga bergerak mendatar bersedia mengumpul tenaga."
+                trend_desc = "Harga bergerak mendatar (*sideway base*), sedang mengumpul tenaga."
+                ai_advice = "💡 **Pandangan AI:** Fasa penumpukan (*accumulation*) yang baik. Sediakan amaran harga (*price alert*) apabila harga menghampiri rintangan terdekat disertai lonjakan volum untuk setup BOB yang berkualiti."
 
             st.markdown(f"""
             <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
                 <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis & Struktur Trend</h4>
                 <p><b>Status Trend:</b> <span style="color: #e3b341;">{selected_trend}</span></p>
+                <p><b>Huraian:</b> {trend_desc}</p>
                 <hr style="border-color: #30363d;">
-                <p style="color: #f85149; margin: 2px 0;">🛡️ <b>Sokongan Kuat:</b> <b>RM {sokongan_kuat}</b></p>
+                <p style="color: #f85149; margin: 2px 0;">🛡️ <b>Sokongan Kuat (Stop-Loss):</b> <b>RM {sokongan_kuat}</b></p>
                 <p style="color: #ff7b72; margin: 2px 0;">📉 <b>Sokongan Terdekat:</b> <b>RM {sokongan_terdekat}</b></p>
                 <p style="color: #ffa657; margin: 2px 0;">🚧 <b>Rintangan Terdekat:</b> <b>RM {rintangan_terdekat}</b></p>
                 <p style="color: #3fb950; margin: 2px 0;">🎯 <b>Target Price (TP):</b> <b>RM {target_price}</b></p>
+                <hr style="border-color: #30363d;">
+                <p style="color: #58a6ff;">{ai_advice}</p>
             </div>
             """, unsafe_allow_html=True)
 
