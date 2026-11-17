@@ -12,7 +12,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Sector Rotation & Compact Screener")
-st.markdown("Sistem Imbasan Pasaran, Prestasi Sektor Live & Paparan Jadual Kompak")
+st.markdown("Sistem Imbasan Pasaran, Prestasi Sektor Live & Paparan Jadual Kompak (Gandaan 100 Unit)")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -99,7 +99,7 @@ else:
 run_scan = st.button("🚀 Mula Imbas Pasaran Sekarang", type="primary", use_container_width=True)
 st.markdown("---")
 
-# --- KEPUTUSAN IMBASAN (FORMAT JADUAL KOMPAK) ---
+# --- KEPUTUSAN IMBASAN (FORMAT JADUAL KOMPAK & GANDAAN 100 UNIT) ---
 if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
@@ -117,7 +117,14 @@ if run_scan:
                 sl = round(price * 0.93, 2)
                 risk_amt = total_capital * (risk_per_trade_pct / 100.0)
                 risk_per_share = price - sl
-                shares = int(risk_amt / risk_per_share) if risk_per_share > 0 else 0
+                
+                if risk_per_share > 0:
+                    raw_shares = risk_amt / risk_per_share
+                    # Bundarkan kepada gandaan 100 unit terdekat (minimum 100 unit / 1 lot)
+                    shares = max(1, round(raw_shares / 100.0)) * 100
+                else:
+                    shares = 100
+                    
                 inv_total = shares * price
                 
                 if change > 2.0 and rsi_val > 55:
