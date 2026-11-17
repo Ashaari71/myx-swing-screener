@@ -98,26 +98,18 @@ st.markdown("---")
 
 if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
     st.subheader("🔗 Rujukan Pantas Data Rasmi Pasaran")
-    st.markdown("Pilih atau semak kaunter Bursa Malaysia di bawah untuk terus merujuk data sahih di platform rasmi.")
+    st.markdown("Klik pautan di bawah untuk terus merujuk data sahih di platform rasmi Bursa Malaysia dan KLSE Screener.")
     
-    col_lk1, col_lk2 = st.columns([1, 1])
-    with col_lk1:
-        ticker_input = st.selectbox("Pilih Kaunter:", sorted(master_bursa_tickers))
-    
-    if ticker_input:
-        bursa_url = f"https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code={ticker_input}"
-        klsescreener_url = f"https://www.klsescreener.com/v2/stocks/view/{ticker_input}"
-        
-        st.markdown(f"""
-        <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d;">
-            <h3 style="color: #58a6ff; margin-top:0;">📌 Pautan Pantas untuk Kaunter: {ticker_input}</h3>
-            <p>Klik pautan di bawah untuk membuka halaman rasmi:</p>
-            <ul>
-                <li>👉 <a href="{bursa_url}" target="_blank"><b>Semak Profil & Laporan di Bursa Malaysia Rasmi</b></a></li>
-                <li>👉 <a href="{klsescreener_url}" target="_blank"><b>Buka Analisis Kaunter di KLSE Screener</b></a></li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d;">
+        <h3 style="color: #58a6ff; margin-top:0;">📌 Pautan Rasmi Pasaran Saham</h3>
+        <p>Pilih platform rujukan di bawah:</p>
+        <ul>
+            <li>👉 <a href="https://www.bursamalaysia.com/" target="_blank"><b>Bursa Malaysia Official Portal</b></a></li>
+            <li>👉 <a href="https://www.klsescreener.com/" target="_blank"><b>KLSE Screener Portal</b></a></li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
@@ -256,6 +248,13 @@ else:
         df_display = pd.DataFrame(st.session_state.scan_results)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
+        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
+        cols_tv = st.columns(6)
+        for i, t_name in enumerate(st.session_state.raw_tickers):
+            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+            with cols_tv[i % 6]:
+                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+                
         st.markdown("---")
         csv_data = df_display.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
