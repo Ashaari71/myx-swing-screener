@@ -13,7 +13,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: BOB/BOD Screener & AI Chart Vision")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Analisis Harga Sokongan/Rintangan")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Analisis Trend Sokongan/Rintangan")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -89,7 +89,7 @@ st.markdown("---")
 
 if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan analisis terperinci nilai harga Sokongan, Rintangan, dan Target Price.")
+    st.markdown("Muat naik *screenshot* carta TradingView anda, pilih status trend, dan lihat paparan rujukan harga Sokongan, Rintangan, serta Target Price.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -102,20 +102,41 @@ if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
         with col_img2:
             st.markdown("### 🤖 Laporan Analisis Teknikal Automatik:")
             
+            # Pilihan Status Trend (Uptrend / Downtrend / Sideway)
+            selected_trend = st.selectbox(
+                "📈 Tentukan Status Trend Semasa Carta:",
+                ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan / Tekanan Jualan)", "⚖️ Sideway (Fasa Tapak / Mendatar Konsolidasi)"]
+            )
+            
             # Input anggaran harga semasa carta yang dimuat naik untuk pengiraan S/R dinamik
             est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
             
-            # Pengiraan rujukan harga automatik berasaskan harga semasa
-            sokongan_kuat = round(est_current_price * 0.90, 2)
-            sokongan_terdekat = round(est_current_price * 0.95, 2)
-            rintangan_terdekat = round(est_current_price * 1.06, 2)
-            target_price = round(est_current_price * 1.15, 2)
-            
-            # Kotak Paparan Analisis Terperinci Nilai Harga
+            # Logik pengiraan rujukan harga berasaskan trend dan harga semasa
+            if "Uptrend" in selected_trend:
+                sokongan_kuat = round(est_current_price * 0.88, 2)
+                sokongan_terdekat = round(est_current_price * 0.94, 2)
+                rintangan_terdekat = round(est_current_price * 1.06, 2)
+                target_price = round(est_current_price * 1.15, 2)
+                trend_desc = "Harga sedang bergerak dalam struktur *Higher Highs* & *Higher Lows* yang sihat."
+            elif "Downtrend" in selected_trend:
+                sokongan_kuat = round(est_current_price * 0.80, 2)
+                sokongan_terdekat = round(est_current_price * 0.90, 2)
+                rintangan_terdekat = round(est_current_price * 1.03, 2)
+                target_price = round(est_current_price * 1.10, 2)
+                trend_desc = "Harga di bawah tekanan jual; menunggu pembentukan tapak lantunan *reversal* sebenar."
+            else:
+                sokongan_kuat = round(est_current_price * 0.85, 2)
+                sokongan_terdekat = round(est_current_price * 0.93, 2)
+                rintangan_terdekat = round(est_current_price * 1.05, 2)
+                target_price = round(est_current_price * 1.12, 2)
+                trend_desc = "Harga bergerak mendatar (*consolidation base*), bersedia mengumpul tenaga untuk arah seterusnya."
+
+            # Kotak Paparan Analisis Terperinci Nilai Harga & Trend
             st.markdown(f"""
             <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
-                <h4 style="color: #58a6ff; margin-top:0;">📊 Penilaian Struktur & Nilai Rujukan Harga</h4>
-                <p><b>1. Fasa Semasa:</b> Struktur carta menunjukkan fasa momentum menaik selepas keluar dari zon tapak pengumpulan (*consolidation*).</p>
+                <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis & Struktur Trend</h4>
+                <p><b>Status Trend:</b> <span style="color: #e3b341;">{selected_trend}</span></p>
+                <p><b>Huraian Pergerakan:</b> {trend_desc}</p>
                 <hr style="border-color: #30363d;">
                 <h4 style="color: #3fb950; margin-bottom: 5px;">🎯 Paras Harga Rujukan Utama:</h4>
                 <p style="color: #f85149; margin: 2px 0;">🛡️ <b>Sokongan Kuat (Support):</b> <b>RM {sokongan_kuat}</b> (Kubu pertahanan trend / Stop-Loss)</p>
@@ -123,7 +144,7 @@ if app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
                 <p style="color: #ffa657; margin: 2px 0;">🚧 <b>Rintangan Terdekat (Resistance):</b> <b>RM {rintangan_terdekat}</b> (Puncak ujian seterusnya)</p>
                 <p style="color: #3fb950; margin: 2px 0;">🎯 <b>Target Price (TP):</b> <b>RM {target_price}</b> (Sasaran kenaikan jika berlaku *breakout*)</p>
                 <hr style="border-color: #30363d;">
-                <p style="color: #e3b341;">💡 <b>Hala Tuju Potensi:</b> Harga berpotensi mendaki menguji rintangan RM {rintangan_terdekat}. Jika berjaya dipecahkan dengan volum besar, laluan terbuka luas menuju sasaran TP RM {target_price}. Sebaliknya, jika gagal, harga dijangka menguji semula sokongan RM {sokongan_terdekat}.</p>
+                <p style="color: #58a6ff;">💡 <b>Cadangan Tindakan:</b> Pantau tindak balas harga di zon rintangan RM {rintangan_terdekat}. Pastikan kemasukan pesanan disokong oleh peningkatan volum dagangan yang sihat.</p>
             </div>
             """, unsafe_allow_html=True)
 
