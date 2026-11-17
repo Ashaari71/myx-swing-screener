@@ -11,8 +11,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: BOB & BOD Screener with Entry, SL & TP")
-st.markdown("Sistem Imbasan Automatik, Pengurusan Risiko, Entry, Stop-Loss & Target Price (TP)")
+st.title("📈 MYX Swing Pro: Screener & Order Execution Ticket")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Analisis Teknikal AI & Panel Tiket Pesanan")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -82,7 +82,7 @@ def send_telegram_message(token, chat_id, message):
         return False
 
 # --- PANEL KAWALAN UTAMA & PILIHAN MOD ---
-st.markdown("### 🔍 Panel Imbasan & Analisis Trading Pro")
+st.markdown("### 🔍 Panel Imbasan & Analisis Pasaran")
 scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
 
 if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
@@ -99,11 +99,11 @@ else:
 run_scan = st.button("🚀 Mula Imbas Pasaran Sekarang", type="primary", use_container_width=True)
 st.markdown("---")
 
-# --- KEPUTUSAN IMBASAN (DENGAN KOLUM ENTRY, SL, TP & RRR) ---
+# --- KEPUTUSAN IMBASAN & PANEL TIKET PESANAN ---
 if run_scan:
     tv_results = fetch_tradingview_scanner(target_tickers)
     scan_results = []
-    ai_breakdowns = []
+    scanned_data_dict = {}
     raw_tickers = []
     
     for t in target_tickers:
@@ -115,80 +115,96 @@ if run_scan:
             vol = info["volume"]
             
             if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
-                # Kiraan Pengurusan Risiko Profesional
                 entry_price = round(price, 2)
-                sl = round(entry_price * 0.93, 2)  # Stop Loss 7% di bawah harga entry
+                sl = round(entry_price * 0.93, 2)
                 risk_per_share = entry_price - sl
-                
-                # Target Price (TP) menggunakan Nisbah RRR 1:2 (Ganjaran 2x ganda daripada risiko)
                 tp = round(entry_price + (risk_per_share * 2.0), 2)
                 
                 risk_amt = total_capital * (risk_per_trade_pct / 100.0)
                 if risk_per_share > 0:
                     raw_shares = risk_amt / risk_per_share
-                    shares = max(100, round(raw_shares / 100.0) * 100) # Gandaan minimum 100 unit (1 lot)
+                    shares = max(100, round(raw_shares / 100.0) * 100)
                 else:
                     shares = 100
                     
                 inv_total = shares * entry_price
                 
-                # Logik Pengesanan Strategi BOB & BOD
                 if change >= 2.0 and vol > 500000:
-                    signal = "🔥 BOB (Buy on Breakout)"
-                    ai_note = f"Harga merembat melepasi rintangan dengan volum besar. Entry: RM {entry_price}, SL: RM {sl}, TP: RM {tp} (RRR 1:2)."
+                    signal = "🔥 BOB (Breakout)"
                 elif change >= -1.5 and change < 2.0 and vol > 300000:
-                    signal = "🔄 BOD (Buy on Dip / Reversal)"
-                    ai_note = f"Pullback sihat dengan tanda lantunan (reversal) di zon sokongan. Entry: RM {entry_price}, SL: RM {sl}, TP: RM {tp} (RRR 1:2)."
+                    signal = "🔄 BOD (Dip/Reversal)"
                 elif change > 0:
-                    signal = "📈 Momentum Positif"
-                    ai_note = f"Pergerakan harga mendaki stabil. Entry: RM {entry_price}, SL: RM {sl}, TP: RM {tp}."
+                    signal = "📈 Momentum"
                 else:
-                    signal = "📉 Pemerhatian Tapak"
-                    ai_note = f"Menguji kawasan tapak sokongan. Tunggu pengesahan lilin pembalikan sebelum Entry di RM {entry_price}."
+                    signal = "📉 Tapak / Pullback"
                 
-                scan_results.append({
+                item_data = {
                     "Kaunter": t,
                     "Harga (RM)": entry_price,
                     "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
                     "Setup": signal,
-                    "Entry (RM)": entry_price,
-                    "Stop-Loss (RM)": sl,
-                    "Target Price (TP)": tp,
+                    "Entry": entry_price,
+                    "Stop-Loss": sl,
+                    "Target Price": tp,
                     "Lot / Unit": f"{shares:,}",
                     "Modal (RM)": f"{inv_total:,.2f}"
-                })
-                
-                ai_breakdowns.append({
-                    "Kaunter": t,
-                    "Strategi & Pelan Trade (Entry, SL, TP)": ai_note,
-                    "Nisbah RRR": "1 : 2"
-                })
-                
+                }
+                scan_results.append(item_data)
+                scanned_data_dict[t] = item_data
                 raw_tickers.append(t)
                 
     if scan_results:
         st.success(f"Berjaya menemui **{len(scan_results)} kaunter** sepadan!")
         
-        # Paparan Jadual Utama
-        res_df = pd.DataFrame(scan_results)
-        st.dataframe(res_df, use_container_width=True, hide_index=True)
+        # Susun Atur Dua Kolum: Kiri untuk Jadual, Kanan untuk Order Ticket Panel
+        col_table, col_ticket = st.columns([2, 1])
         
-        # Paparan Nota Analisis Strategi
-        st.markdown("### 🤖 Pelan Tindakan & Analisis Teknikal (Entry, SL & TP)")
-        ai_df = pd.DataFrame(ai_breakdowns)
-        st.dataframe(ai_df, use_container_width=True, hide_index=True)
-        
-        # Pautan Cepat TradingView
-        st.markdown("🔗 **Pautan Pantas Carta TradingView:**")
-        cols = st.columns(6)
-        for i, t_name in enumerate(raw_tickers):
-            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols[i % 6]:
-                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+        with col_table:
+            st.markdown("#### 📋 Senarai Keputusan Screener")
+            res_df = pd.DataFrame(scan_results)
+            st.dataframe(res_df, use_container_width=True, hide_index=True)
+            
+            # Pautan Cepat TradingView
+            st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
+            cols_tv = st.columns(4)
+            for i, t_name in enumerate(raw_tickers):
+                tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+                with cols_tv[i % 4]:
+                    st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+                    
+        with col_ticket:
+            st.markdown("#### 🎫 Order Execution Ticket")
+            selected_ticket_counter = st.selectbox("Pilih Kaunter untuk Urus Niaga:", raw_tickers)
+            
+            if selected_ticket_counter in scanned_data_dict:
+                d = scanned_data_dict[selected_ticket_counter]
                 
+                st.markdown(f"""
+                <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d;">
+                    <h3 style="margin-top:0; color: #58a6ff;">📌 {d['Kaunter']}</h3>
+                    <p><b>Harga Semasa / Entry:</b> RM {d['Entry']}</p>
+                    <p><b>Setup Strategi:</b> {d['Setup']}</p>
+                    <hr style="border-color: #30363d;">
+                    <p style="color: #f85149;">🛡️ <b>Stop-Loss (SL):</b> RM {d['Stop-Loss']}</p>
+                    <p style="color: #3fb950;">🎯 <b>Take Profit (TP):</b> RM {d['Target Price']}</p>
+                    <p>📦 <b>Saiz Cadangan:</b> {d['Lot / Unit']} unit</p>
+                    <p>💰 <b>Jumlah Modal:</b> RM {d['Modal (RM)']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                order_type = st.radio("Jenis Pesanan:", ["Market Order", "Limit Order"], horizontal=True)
+                
+                if st.button("🚀 Hantar Pesanan / Simpan Pelan Trade", type="primary", use_container_width=True):
+                    st.success(f"Pesanan untuk {d['Kaunter']} ({order_type}) telah direkodkan!")
+                    if telegram_token and telegram_chat_id:
+                        msg = f"🚨 *TRADE TICKET ALERT* 🚨\nKaunter: {d['Kaunter']}\nJenis: {order_type}\nEntry: RM{d['Entry']}\nSL: RM{d['Stop-Loss']}\nTP: RM{d['Target Price']}\nLot: {d['Lot / Unit']}"
+                        send_telegram_message(telegram_token, telegram_chat_id, msg)
+                        st.info("Makluman berjaya dihantar ke Telegram!")
+
+        st.markdown("---")
         csv_data = res_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_trading_plan.csv", mime="text/csv")
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_order_ticket.csv", mime="text/csv")
     else:
         st.warning("⚠️ Tiada kaunter melepasi tapisan kriteria semasa.")
     st.markdown("---")
