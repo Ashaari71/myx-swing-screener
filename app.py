@@ -83,10 +83,7 @@ if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
     max_risk_rm = calc_capital * (calc_risk_pct / 100.0)
     risk_per_share = calc_entry - calc_sl
     raw_shares = max_risk_rm / risk_per_share
-    
-    # Peraturan Bursa Malaysia: Minimum 1 lot (100 unit) dan dalam gandaan 100 unit
     suggested_shares = max(100, int(raw_shares // 100) * 100)
-    
     total_investment = suggested_shares * calc_entry
     actual_risk_rm = suggested_shares * risk_per_share
     potential_profit = suggested_shares * (calc_tp - calc_entry) if calc_tp > calc_entry else 0
@@ -149,7 +146,7 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
 
 elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
     st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan rujukan harga Sokongan, Rintangan, Target Price serta Cadangan & Pandangan AI.")
+    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan rujukan harga Sokongan, Rintangan, Target Price serta Pandangan AI yang Dinamik.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -167,27 +164,49 @@ elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
             )
             est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
             
+            # Dinamik pengiraan paras rujukan berdasarkan input harga
             if "Uptrend" in selected_trend:
                 sokongan_kuat = round(est_current_price * 0.88, 2)
                 sokongan_terdekat = round(est_current_price * 0.94, 2)
                 rintangan_terdekat = round(est_current_price * 1.06, 2)
                 target_price = round(est_current_price * 1.15, 2)
-                trend_desc = "Harga bergerak dalam struktur kenaikan sihat (*Higher Highs & Higher Lows*)."
-                ai_advice = "✨ **Pandangan AI:** Momentum pembeli masih mendominasi pasaran. Cadangan strategi adalah tunggu *pullback* sihat berhampiran zon Sokongan Terdekat atau tunggu pengesahan *breakout* volum tinggi di paras Rintangan Terdekat sebelum masuk posisi."
+                trend_desc = "Struktur harga membentuk Higher Highs & Higher Lows yang sihat dengan momentum pembeli yang aktif."
+                
+                # Variasi pandangan AI secara rawak supaya tidak berulang
+                uptrend_advs = [
+                    "✨ **Pandangan AI:** Momentum kenaikan kukuh. Fokus kepada strategi *Buy on Dip* apabila harga membuat *pullback* ringan ke zon sokongan terdekat sebelum menyambung kenaikan.",
+                    "🚀 **Pandangan AI:** Harga sedang menguji zon rintangan. Pastikan breakout disokong oleh lonjakan volum harian yang ketara bagi mengelakkan perangkap *fake breakout*.",
+                    "🔥 **Pandangan AI:** Setup pasaran sangat sihat untuk swing trading. Letakkan trailing stop-loss di bawah sokongan terdekat untuk melindungi keuntungan semasa."
+                ]
+                ai_advice = np.random.choice(uptrend_advs)
+                
             elif "Downtrend" in selected_trend:
                 sokongan_kuat = round(est_current_price * 0.80, 2)
                 sokongan_terdekat = round(est_current_price * 0.90, 2)
                 rintangan_terdekat = round(est_current_price * 1.03, 2)
                 target_price = round(est_current_price * 1.10, 2)
-                trend_desc = "Harga di bawah tekanan jual; struktur pasaran menunjukkan kelemahan."
-                ai_advice = "⚠️ **Pandangan AI:** Elakkan daripada membeli secara melulu (*catching falling knives*). Tunggu sehingga harga berjaya membentuk tapak pengumpulan (*consolidation base*) dan lilin pembalikan (*reversal candle*) berserta volum besar di zon sokongan."
+                trend_desc = "Tekanan jualan menguasai carta; harga berada di bawah purata pergerakan utama."
+                
+                downtrend_advs = [
+                    "⚠️ **Pandangan AI:** Elakkan tangkap pisau jatuh (*catching falling knives*). Tunggu sehingga muncul batang lilin pembalikan (*reversal candle*) yang jelas di zon sokongan kuat.",
+                    "📉 **Pandangan AI:** Sentimen pasaran lemah. Adalah lebih selamat untuk kekal *cash* atau tunggu pembentukan tapak penumpukan baharu sebelum merancang sebarang kemasukan.",
+                    "🛡️ **Pandangan AI:** Sekiranya sudah memegang posisi, ketatkan disiplin *stop-loss* di bawah sokongan kuat untuk mengehadkan risiko kerugian modal."
+                ]
+                ai_advice = np.random.choice(downtrend_advs)
+                
             else:
                 sokongan_kuat = round(est_current_price * 0.85, 2)
                 sokongan_terdekat = round(est_current_price * 0.93, 2)
                 rintangan_terdekat = round(est_current_price * 1.05, 2)
                 target_price = round(est_current_price * 1.12, 2)
-                trend_desc = "Harga bergerak mendatar (*sideway base*), sedang mengumpul tenaga."
-                ai_advice = "💡 **Pandangan AI:** Fasa penumpukan (*accumulation*) yang baik. Sediakan amaran harga (*price alert*) apabila harga menghampiri rintangan terdekat disertai lonjakan volum untuk setup BOB yang berkualiti."
+                trend_desc = "Harga bergerak mendatar (fasa konsolidasi tapak), membina tenaga sebelum arah seterusnya."
+                
+                sideway_advs = [
+                    "💡 **Pandangan AI:** Fasa pengumpulan (*accumulation*) yang baik. Perhatikan aktiviti volum; volum rendah ketika susut harga menunjukkan tekanan jual mula mereda.",
+                    "⚖️ **Pandangan AI:** Sediakan amaran harga (*price alert*) di paras rintangan terdekat. Masuk apabila berlaku pemecahan rintangan disertai lonjakan volum dagangan.",
+                    "🔍 **Pandangan AI:** Pasaran sedang berehat. Peluang bagus untuk melakukan kajian asas syarikat sementara menunggu isyarat breakout rasmi."
+                ]
+                ai_advice = np.random.choice(sideway_advs)
 
             st.markdown(f"""
             <div style="background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d;">
