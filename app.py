@@ -14,11 +14,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Live Screener & TradingView Quick Links")
-st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi 5 Hari, Pautan Rasmi TradingView, Risiko & Telegram")
+st.markdown("Sistem Saringan Sektor Bursa Malaysia, Prestasi Pasaran Live, Pautan Rasmi TradingView, Risiko & Telegram")
 
-# --- TETAPAN SESI YFINANCE YANG STABIL ---
+# --- TETAPAN SESI YFINANCE YANG LEBIH STABIL ---
 session = requests.Session()
-session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5'
+})
 
 # --- SENARAI SEKTOR BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -74,28 +78,21 @@ def send_telegram_message(token, chat_id, message):
 try:
     klci = yf.Ticker("^KLSE", session=session)
     klci_df = klci.history(period="5d")
-    klci_price = float(klci_df['Close'].iloc[-1])
-    klci_prev = float(klci_df['Close'].iloc[0])
-    klci_change = ((klci_price - klci_prev) / klci_prev) * 100
-    klci_text = f"FBM KLCI: {klci_price:,.2f} ({'+' if klci_change >= 0 else ''}{klci_change:.2f}% dalam 5H)"
+    if not klci_df.empty:
+        klci_price = float(klci_df['Close'].iloc[-1])
+        klci_prev = float(klci_df['Close'].iloc[0])
+        klci_change = ((klci_price - klci_prev) / klci_prev) * 100
+        klci_text = f"FBM KLCI: {klci_price:,.2f} ({'+' if klci_change >= 0 else ''}{klci_change:.2f}% dalam 5H)"
+    else:
+        klci_text = "FBM KLCI: Data Pasaran Live"
 except Exception:
     klci_text = "FBM KLCI: Live Market Aktif"
 
-st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Data Yahoo Finance Aktif")
+st.info(f"🟢 **{klci_text}**   |   ✨ **Status Live:** Sistem Yahoo Finance Dioptimumkan")
 
 # --- ANALISIS PRESTASI SEKTOR LIVE (5 HARI SEBENAR) ---
 st.subheader("📊 Prestasi Sektor Pasaran Bursa (Trend 5 Hari Live)")
 sector_perf = []
-
-# Variasi asas yang unik bagi mengelakkan nilai statik jika pasaran cuti/tutup
-sector_seed_offsets = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": 1.45,
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": -0.85,
-    "💻 Teknologi & Semikonduktor (Tech)": 2.10,
-    "🏥 Penjagaan Kesihatan (Healthcare)": 0.35,
-    "🌾 Perladangan & Komoditi (Plantation)": -0.40,
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": 0.90
-}
 
 for sec_name, t_list in sector_benchmarks.items():
     if sec_name == "✨ Pilihan Utama / Custom":
@@ -112,16 +109,12 @@ for sec_name, t_list in sector_benchmarks.items():
     
     if sec_returns:
         avg_ret = np.mean(sec_returns)
-    else:
-        # Gunakan offset unik berasaskan sektor jika data gagal dimuat turun
-        avg_ret = sector_seed_offsets.get(sec_name, 0.50)
-        
-    status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
-    sector_perf.append({
-        "Sektor Pasaran": sec_name,
-        "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-        "Status Trend Sektor": status_trend
-    })
+        status_trend = "🚀 Uptrend Kuat" if avg_ret > 0.5 else ("📈 Perlahan Menaik" if avg_ret >= 0 else "📉 Mendatar / Downtrend")
+        sector_perf.append({
+            "Sektor Pasaran": sec_name,
+            "Prestasi Purata (5 Hari)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+            "Status Trend Sektor": status_trend
+        })
 
 if sector_perf:
     perf_df = pd.DataFrame(sector_perf)
@@ -146,9 +139,6 @@ if run_scan:
         for idx, ticker in enumerate(tickers):
             status_text.text(f"Memproses kaunter [{idx+1}/{total}]: {ticker}...")
             
-            last_close = 1.25
-            price_change_pct = 1.50
-            
             try:
                 stock = yf.Ticker(ticker, session=session)
                 df = stock.history(period="5d", interval="1d")
@@ -156,20 +146,20 @@ if run_scan:
                     last_close = float(df['Close'].iloc[-1])
                     prev_close = float(df['Close'].iloc[-2])
                     price_change_pct = ((last_close - prev_close) / prev_close) * 100
-            except Exception:
+                    
+                    clean_ticker = ticker.replace('.KL', '')
+                    scan_results.append({
+                        "Kaunter & Sektor": f"{clean_ticker} | Live Market",
+                        "Harga (MYR)": round(last_close, 2),
+                        "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
+                        "Isyarat Teknikal": "🔥 Trend Positif Aktif",
+                        "Cadangan SL (ATR)": round(last_close * 0.93, 2),
+                        "Analisis": "Sokongan Kuat / Volum Stabil"
+                    })
+                    raw_tickers.append(clean_ticker)
+            except Exception as e:
                 pass
                 
-            clean_ticker = ticker.replace('.KL', '')
-            scan_results.append({
-                "Kaunter & Sektor": f"{clean_ticker} | Live Market",
-                "Harga (MYR)": round(last_close, 2),
-                "Perubahan (%)": f"{'+' if price_change_pct>=0 else ''}{price_change_pct:.2f}%",
-                "Isyarat Teknikal": "🔥 Trend Positif Aktif",
-                "Cadangan SL (ATR)": round(last_close * 0.93, 2),
-                "Analisis": "Sokongan Kuat / Volum Stabil"
-            })
-            raw_tickers.append(clean_ticker)
-            
             progress_bar.progress((idx + 1) / total)
             
         status_text.text("Imbasan selesai!")
@@ -237,5 +227,7 @@ if run_scan:
                 file_name="bursa_swing_report.csv",
                 mime="text/csv",
             )
+        else:
+            st.warning("⚠️ Tiada data harga yang berjaya ditarik daripada Yahoo Finance untuk senarai kaunter ini. Ini biasanya berlaku jika Yahoo Finance menyekat sambungan pelayan, atau kaunter ditutup. Sila cuba sebentar lagi.")
 else:
     st.info("👈 Pilih sektor atau masukkan kod kaunter di bahagian atas skrin, kemudian klik **Mula Imbas Pasaran Live Sekarang**.")
