@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
+from PIL import Image
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
@@ -11,8 +12,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: BOB & BOD Screener & Sector Live")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Pautan Pantas TradingView")
+st.title("📈 MYX Swing Pro: BOB/BOD Screener & AI Chart Vision")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, Prestasi Sektor Live & Analisis Imej Carta Visual")
 
 # --- MASTER SEKTOR & KAUNTER BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -82,105 +83,135 @@ if "scan_results" not in st.session_state:
 if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
 
-# --- PANEL KAWALAN UTAMA & PILIHAN MOD ---
-st.markdown("### 🔍 Panel Imbasan & Analisis Pasaran")
-scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
-
-if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        sel_sector = st.selectbox("Pilih Sektor:", list(sector_benchmarks.keys()))
-        default_t = ", ".join(sector_benchmarks[sel_sector])
-    with col_m2:
-        custom_input = st.text_area("Atau Edit Kod Kaunter (Koma):", value=default_t, height=75)
-        target_tickers = [t.strip().upper().replace('.KL', '') for t in custom_input.split(",") if t.strip()]
-else:
-    target_tickers = master_bursa_tickers
-
-run_scan = st.button("🚀 Mula Imbas Pasaran Sekarang", type="primary", use_container_width=True)
+# --- PANEL KAWALAN UTAMA & NAVIGASI MOD ---
+app_mode = st.radio("Pilih Mod Utama:", ["🔍 Screener & Prestasi Sektor", "📸 AI Chart Image Scanner (Muat Naik Carta)"], horizontal=True)
 st.markdown("---")
 
-if run_scan:
-    tv_results = fetch_tradingview_scanner(target_tickers)
-    scan_results = []
-    raw_tickers = []
+if app_mode == "📸 AI Chart Image Scanner (Muat Naik Carta)":
+    st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
+    st.markdown("Muat naik *screenshot* carta TradingView anda untuk semakan panduan teknikal BOB/BOD terpimpin.")
     
-    for t in target_tickers:
-        if t in tv_results:
-            info = tv_results[t]
-            price = info["close"]
-            change = info["change"]
-            rsi_val = info["rsi"]
-            vol = info["volume"]
+    uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
+    
+    if uploaded_chart is not None:
+        col_img1, col_img2 = st.columns([1, 1])
+        with col_img1:
+            image = Image.open(uploaded_chart)
+            st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
-            if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
-                entry_price = round(price, 2)
-                
-                # Logik Strategi BOB & BOD
-                if change >= 2.0 and vol > 500000:
-                    signal = "🔥 BOB (Breakout)"
-                elif change >= -1.5 and change < 2.0 and vol > 300000:
-                    signal = "🔄 BOD (Dip/Reversal)"
-                elif change > 0:
-                    signal = "📈 Momentum"
+        with col_img2:
+            st.markdown("### 🤖 Senarai Semak Analisis Teknikal Visual:")
+            st.info("Sila semak carta yang anda muat naik berdasarkan kriteria profesional berikut:")
+            
+            check_base = st.checkbox("1. Adakah harga membentuk tapak mendatar (*Base Consolidation*) sebelum ini?")
+            check_vol = st.checkbox("2. Adakah terdapat lonjakan volum (*Volume Spike*) pada batang lilin utama?")
+            check_breakout = adakah_breakout = st.checkbox("3. Adakah harga memecah paras rintangan terdekat (untuk BOB)?")
+            check_reversal = st.checkbox("4. Adakah terdapat lilin lantunan / penolakan harga (*Reversal/Pin Bar*) di zon sokongan (untuk BOD)?")
+            
+            if st.button("🔍 Sahkan Status Setup Carta Ini", type="primary"):
+                if check_base and check_vol and (check_breakout or check_reversal):
+                    st.success("✨ **Setup Berpotensi Tinggi!** Carta menunjukkan ciri-ciri kukuh mengikut kriteria BOB/BOD.")
                 else:
-                    signal = "📉 Tapak / Pullback"
-                
-                item_data = {
-                    "Kaunter": t,
-                    "Harga (RM)": entry_price,
-                    "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
-                    "RSI": round(rsi_val, 1),
-                    "Setup Strategi": signal,
-                    "Volum": f"{vol:,.0f}"
-                }
-                scan_results.append(item_data)
-                raw_tickers.append(t)
-                
-    st.session_state.scan_results = scan_results
-    st.session_state.raw_tickers = raw_tickers
-    
-    if scan_results and telegram_token and telegram_chat_id:
-        msg = f"🚨 *MYX SCREENER ALERT* 🚨\nBerjaya mengesan {len(scan_results)} kaunter sepadan dengan kriteria BOB/BOD."
-        send_telegram_message(telegram_token, telegram_chat_id, msg)
+                    st.warning("⚠️ **Kurang Berjaya / Perhati Lagi:** Pastikan syarat volum dan tapak sokongan/rintangan dipenuhi pada carta.")
 
-# --- 1. PAPAN PENDAHUDU SEKTOR (SECTOR LEADERSHIP) ---
-st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
-sector_perf = []
-for sec_name, t_list in sector_benchmarks.items():
-    sec_data = fetch_tradingview_scanner(t_list)
-    sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
-    avg_ret = np.mean(sec_changes) if sec_changes else 0.0
-    status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah / Pullback")
-    sector_perf.append({
-        "Sektor Pasaran": sec_name,
-        "Avg Ret": avg_ret,
-        "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-        "Status Trend": status_trend
-    })
-
-if sector_perf:
-    perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
-    st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
-
-st.markdown("---")
-
-# --- 2. KEPUTUSAN SCREENER & PAUTAN TRADINGVIEW ---
-if st.session_state.scan_results:
-    st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
-    
-    df_display = pd.DataFrame(st.session_state.scan_results)
-    st.dataframe(df_display, use_container_width=True, hide_index=True)
-    
-    st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
-    cols_tv = st.columns(6)
-    for i, t_name in enumerate(st.session_state.raw_tickers):
-        tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-        with cols_tv[i % 6]:
-            st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
-            
-    st.markdown("---")
-    csv_data = df_display.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
 else:
-    st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
+    # --- MOD SCREENER & SEKTOR ASAL ---
+    scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
+
+    if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            sel_sector = st.selectbox("Pilih Sektor:", list(sector_benchmarks.keys()))
+            default_t = ", ".join(sector_benchmarks[sel_sector])
+        with col_m2:
+            custom_input = st.text_area("Atau Edit Kod Kaunter (Koma):", value=default_t, height=75)
+            target_tickers = [t.strip().upper().replace('.KL', '') for t in custom_input.split(",") if t.strip()]
+    else:
+        target_tickers = master_bursa_tickers
+
+    run_scan = st.button("🚀 Mula Imbas Pasaran Sekarang", type="primary", use_container_width=True)
+    st.markdown("---")
+
+    if run_scan:
+        tv_results = fetch_tradingview_scanner(target_tickers)
+        scan_results = []
+        raw_tickers = []
+        
+        for t in target_tickers:
+            if t in tv_results:
+                info = tv_results[t]
+                price = info["close"]
+                change = info["change"]
+                rsi_val = info["rsi"]
+                vol = info["volume"]
+                
+                if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
+                    entry_price = round(price, 2)
+                    
+                    if change >= 2.0 and vol > 500000:
+                        signal = "🔥 BOB (Breakout)"
+                    elif change >= -1.5 and change < 2.0 and vol > 300000:
+                        signal = "🔄 BOD (Dip/Reversal)"
+                    elif change > 0:
+                        signal = "📈 Momentum"
+                    else:
+                        signal = "📉 Tapak / Pullback"
+                    
+                    item_data = {
+                        "Kaunter": t,
+                        "Harga (RM)": entry_price,
+                        "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
+                        "RSI": round(rsi_val, 1),
+                        "Setup Strategi": signal,
+                        "Volum": f"{vol:,.0f}"
+                    }
+                    scan_results.append(item_data)
+                    raw_tickers.append(t)
+                    
+        st.session_state.scan_results = scan_results
+        st.session_state.raw_tickers = raw_tickers
+        
+        if scan_results and telegram_token and telegram_chat_id:
+            msg = f"🚨 *MYX SCREENER ALERT* 🚨\nBerjaya mengesan {len(scan_results)} kaunter sepadan dengan kriteria BOB/BOD."
+            send_telegram_message(telegram_token, telegram_chat_id, msg)
+
+    # --- 1. PAPAN PENDAHUDU SEKTOR ---
+    st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
+    sector_perf = []
+    for sec_name, t_list in sector_benchmarks.items():
+        sec_data = fetch_tradingview_scanner(t_list)
+        sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+        avg_ret = np.mean(sec_changes) if sec_changes else 0.0
+        status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah / Pullback")
+        sector_perf.append({
+            "Sektor Pasaran": sec_name,
+            "Avg Ret": avg_ret,
+            "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+            "Status Trend": status_trend
+        })
+
+    if sector_perf:
+        perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
+        st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+
+    # --- 2. KEPUTUSAN SCREENER & PAUTAN TRADINGVIEW ---
+    if st.session_state.scan_results:
+        st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
+        
+        df_display = pd.DataFrame(st.session_state.scan_results)
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        
+        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
+        cols_tv = st.columns(6)
+        for i, t_name in enumerate(st.session_state.raw_tickers):
+            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+            with cols_tv[i % 6]:
+                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+                
+        st.markdown("---")
+        csv_data = df_display.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
+    else:
+        st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
