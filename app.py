@@ -13,7 +13,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Screener, AI Chart Vision & Pautan Rasmi")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Rujukan Pantas Bursa / Pick@Stock")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Rujukan Pantas Bursa / CGS-iTrade")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -90,13 +90,13 @@ app_mode = st.radio(
     [
         "🔍 Screener & Prestasi Sektor", 
         "📸 AI Chart Image Scanner & Analisis Terperinci", 
-        "🔗 Pautan Pantas Data Rasmi (Bursa & Pick@Stock)"
+        "🔗 Pautan Pantas Data Rasmi (Bursa & CGS-iTrade)"
     ], 
     horizontal=True
 )
 st.markdown("---")
 
-if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & Pick@Stock)":
+if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & CGS-iTrade)":
     st.subheader("🔗 Rujukan Pantas Data Rasmi Pasaran")
     st.markdown("Masukkan kod kaunter Bursa Malaysia pilihan anda untuk terus merujuk data sahih di platform rasmi.")
     
@@ -106,17 +106,15 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & Pick@Stock)":
     
     if ticker_input:
         bursa_url = f"https://www.bursamalaysia.com/trade/trading_resources/listing_directory/company-profile?stock_code={ticker_input}"
-        pickatstock_url = "https://www.pickatstock.com/"
-        tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{ticker_input}"
+        cgstrade_url = f"https://www.itradecgs.com.my/"
         
         st.markdown(f"""
         <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d;">
             <h3 style="color: #58a6ff; margin-top:0;">📌 Pautan Pantas untuk Kaunter: {ticker_input}</h3>
-            <p>Klik pautan di bawah untuk membuka halaman rasmi dan menyemak data fundamental sebenar:</p>
+            <p>Klik pautan di bawah untuk membuka halaman rasmi:</p>
             <ul>
                 <li>👉 <a href="{bursa_url}" target="_blank"><b>Semak Profil & Laporan di Bursa Malaysia Rasmi</b></a></li>
-                <li>👉 <a href="{pickatstock_url}" target="_blank"><b>Buka Portal Pick@Stock</b></a></li>
-                <li>👉 <a href="{tv_url}" target="_blank"><b>Buka Carta Live di TradingView (MYX:{ticker_input})</b></a></li>
+                <li>👉 <a href="{cgstrade_url}" target="_blank"><b>Buka Portal CGS-CIMB iTrade (KLSE)</b></a></li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -254,13 +252,6 @@ else:
         df_display = pd.DataFrame(st.session_state.scan_results)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
-        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
-        cols_tv = st.columns(6)
-        for i, t_name in enumerate(st.session_state.raw_tickers):
-            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[i % 6]:
-                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
-                
         st.markdown("---")
         csv_data = df_display.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
