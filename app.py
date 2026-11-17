@@ -70,7 +70,7 @@ st.sidebar.header("🔔 Telegram Bot Alert")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
-# --- KALKULATOR SAIZ POSISI & RISIKO DI SIDEBAR ---
+# --- KALKULATOR SAIZ POSISI & RISIKO (MENGIKUT LOT BURSA MALAYSIA) ---
 st.sidebar.markdown("---")
 st.sidebar.header("🧮 Kalkulator Saiz Posisi & Risiko")
 calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
@@ -82,17 +82,22 @@ calc_tp = st.sidebar.number_input("Harga Target (TP) (RM):", value=1.20, step=0.
 if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
     max_risk_rm = calc_capital * (calc_risk_pct / 100.0)
     risk_per_share = calc_entry - calc_sl
-    suggested_shares = int(max_risk_rm / risk_per_share)
+    raw_shares = max_risk_rm / risk_per_share
+    
+    # Peraturan Bursa Malaysia: Minimum 1 lot (100 unit) dan dalam gandaan 100 unit
+    suggested_shares = max(100, int(raw_shares // 100) * 100)
+    
     total_investment = suggested_shares * calc_entry
+    actual_risk_rm = suggested_shares * risk_per_share
     potential_profit = suggested_shares * (calc_tp - calc_entry) if calc_tp > calc_entry else 0
-    risk_reward_ratio = (calc_tp - calc_entry) / (calc_entry - calc_sl) if (calc_entry - calc_sl) > 0 else 0
+    risk_reward_ratio = (calc_tp - calc_entry) / risk_per_share if risk_per_share > 0 else 0
     
     st.sidebar.markdown(f"""
     <div style="background-color: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px;">
-        <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Keputusan Pengiraan:</p>
-        <p style="margin:2px 0;">📦 <b>Jumlah Unit Saham:</b> {suggested_shares:,} unit</p>
+        <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Keputusan Pengiraan (Lot Bursa):</p>
+        <p style="margin:2px 0;">📦 <b>Jumlah Unit Saham:</b> {suggested_shares:,} unit ({suggested_shares//100} Lot)</p>
         <p style="margin:2px 0;">💰 <b>Jumlah Modal Diguna:</b> RM {total_investment:,.2f}</p>
-        <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Kerugian:</b> RM {max_risk_rm:,.2f} ({calc_risk_pct}%)</p>
+        <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Sebenar:</b> RM {actual_risk_rm:,.2f}</p>
         <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi Untung (TP):</b> RM {potential_profit:,.2f}</p>
         <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R:</b> 1 : {risk_reward_ratio:.2f}</p>
     </div>
