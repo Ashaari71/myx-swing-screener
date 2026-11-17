@@ -128,7 +128,6 @@ if run_scan:
                 
                 risk_amt = total_capital * (risk_per_trade_pct / 100.0)
                 if risk_per_share > 0:
-                    # Kiraan unit tepat mengikut risiko modal (tanpa paksa 100 unit)
                     shares = max(1, int(risk_amt / risk_per_share))
                 else:
                     shares = 100
@@ -139,4 +138,77 @@ if run_scan:
                     signal = "🔥 BOB (Breakout)"
                 elif change >= -1.5 and change < 2.0 and vol > 300000:
                     signal = "🔄 BOD (Dip/Reversal)"
-                elif
+                elif change > 0:
+                    signal = "📈 Momentum"
+                else:
+                    signal = "📉 Tapak / Pullback"
+                
+                item_data = {
+                    "Kaunter": t,
+                    "Harga (RM)": entry_price,
+                    "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
+                    "RSI": round(rsi_val, 1),
+                    "Setup": signal,
+                    "Entry": entry_price,
+                    "Stop-Loss": sl,
+                    "Target Price": tp,
+                    "Unit / Saham": f"{shares:,}",
+                    "Modal (RM)": f"{inv_total:,.2f}"
+                }
+                scan_results.append(item_data)
+                scanned_data_dict[t] = item_data
+                raw_tickers.append(t)
+                
+    st.session_state.scan_results = scan_results
+    st.session_state.scanned_data_dict = scanned_data_dict
+    st.session_state.raw_tickers = raw_tickers
+
+if st.session_state.scan_results:
+    st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
+    
+    col_table, col_ticket = st.columns([2, 1])
+    
+    with col_table:
+        st.markdown("#### 📋 Senarai Keputusan Screener")
+        res_df = pd.DataFrame(st.session_state.scan_results)
+        st.dataframe(res_df, use_container_width=True, hide_index=True)
+        
+        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
+        cols_tv = st.columns(4)
+        for i, t_name in enumerate(st.session_state.raw_tickers):
+            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+            with cols_tv[i % 4]:
+                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+                
+    with col_ticket:
+        st.markdown("#### 🎫 Order Execution Ticket")
+        selected_ticket_counter = st.selectbox("Pilih Kaunter untuk Urus Niaga:", st.session_state.raw_tickers)
+        
+        if selected_ticket_counter in st.session_state.scanned_data_dict:
+            d = st.session_state.scanned_data_dict[selected_ticket_counter]
+            
+            st.markdown(f"""
+            <div style="background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d;">
+                <h3 style="margin-top:0; color: #58a6ff;">📌 {d['Kaunter']}</h3>
+                <p><b>Harga Semasa / Entry:</b> RM {d['Entry']}</p>
+                <p><b>Setup Strategi:</b> {d['Setup']}</p>
+                <hr style="border-color: #30363d;">
+                <p style="color: #f85149;">🛡️ <b>Stop-Loss (SL):</b> RM {d['Stop-Loss']}</p>
+                <p style="color: #3fb950;">🎯 <b>Take Profit (TP):</b> RM {d['Target Price']}</p>
+                <p>📦 <b>Saiz Cadangan:</b> {d['Unit / Saham']} unit</p>
+                <p>💰 <b>Jumlah Modal:</b> RM {d['Modal (RM)']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            order_type = st.radio("Jenis Pesanan:", ["Market Order", "Limit Order"], horizontal=True)
+            
+            if st.button("🚀 Hantar Pesanan / Simpan Pelan Trade", type="primary", use_container_width=True):
+                st.success(f"Pesanan untuk {d['Kaunter']} ({order_type}) telah direkodkan!")
+                if telegram_token and telegram_chat_id:
+                    msg = f"🚨 *TRADE TICKET ALERT* 🚨\nKaunter: {d['Kaunter']}\nJenis: {order_type}\nEntry: RM{d['Entry']}\nSL: RM{d['Stop-Loss']}\nTP: RM{d['Target Price']}\nUnit: {d['Unit / Saham']}"
+                    send_telegram_message(telegram_token, telegram_chat_id, msg)
+                    st.info("Makluman berjaya dihantar ke Telegram!")
+
+    st.markdown("---")
+    csv_data = pd.DataFrame(st.session_state.scan_results).to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_
