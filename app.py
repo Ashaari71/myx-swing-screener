@@ -30,7 +30,10 @@ sector_benchmarks = {
 }
 
 master_bursa_tickers = []
-for t_list in sector_benchmarks.values():
+ticker_to_sector = {}
+for sec_name, t_list in sector_benchmarks.items():
+    for t in t_list:
+        ticker_to_sector[t] = sec_name
     master_bursa_tickers.extend(t_list)
 master_bursa_tickers = list(set(master_bursa_tickers))
 
@@ -208,7 +211,6 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
     if uploaded_chart is not None:
-        # Susunan Lebar Penuh (Atas: Imej & Tetapan, Bawah: Laporan Analisis Lebar Penuh)
         col_img, col_settings = st.columns([1, 1])
         with col_img:
             image = Image.open(uploaded_chart)
@@ -233,7 +235,6 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
                 with st.spinner("🤖 OpenAI sedang meneliti pergerakan carta & menilai potensi setup BOB/BOD..."):
                     ai_report = analyze_chart_bob_bod(openai_api_key, image, selected_trend, est_current_price)
                     
-                # Paparan Kotak Laporan Lebar Penuh (Full Width)
                 st.markdown(f"""
                 <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; width: 100%;">
                     <h3 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis Taktikal BOB & BOD (AI)</h3>
@@ -287,8 +288,11 @@ else:
                     else:
                         signal = "📉 Tapak / Pullback"
                     
+                    sec_name = ticker_to_sector.get(t, "Am / Lain-lain")
+                    
                     item_data = {
                         "Kaunter": t,
+                        "Sektor": sec_name,
                         "Harga (RM)": entry_price,
                         "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                         "RSI": round(rsi_val, 1),
@@ -299,7 +303,7 @@ else:
                     raw_tickers.append(t)
                     
                     if "BOB" in signal or "BOD" in signal:
-                        alert_messages.append(f"• *{t}* | Harga: RM {entry_price} | Setup: {signal} | Vol: {vol:,.0f}")
+                        alert_messages.append(f"• *{t}* ({sec_name}) | Harga: RM {entry_price} | Setup: {signal} | Vol: {vol:,.0f}")
                     
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
