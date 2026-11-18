@@ -139,7 +139,7 @@ def analyze_chart_with_openai(api_key, image, trend, price):
         )
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini", # Model pantas & cekap untuk imej dan teks
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "user",
@@ -155,7 +155,7 @@ def analyze_chart_with_openai(api_key, image, trend, price):
                 }
             ],
             max_tokens=600
-        }
+        )
         return response.choices[0].message.content
     except Exception as e:
         return f"⚠️ Ralat menyambung ke OpenAI API: {str(e)}"
@@ -328,7 +328,7 @@ else:
         cols_tv = st.columns(6)
         for i, t_name in enumerate(st.session_state.raw_tickers):
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[i%6]:
+            with cols_tv[i % 6]:
                 st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
                 
         st.markdown("---")
