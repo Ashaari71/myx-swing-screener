@@ -15,8 +15,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, AI Vision BOB/BOD & Pautan Rasmi")
-st.markdown("Sistem Imbasan Automatik, AI Chart Inspector Khusus Teknik BOB/BOD & Rujukan Pantas Bursa")
+st.title("📈 MYX Swing Pro: Screener, AI Vision BOB/BOD & Watchlist")
+st.markdown("Sistem Imbasan Automatik, AI Chart Inspector, Watchlist Peribadi & Pengurusan Risiko Multi-TP")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -65,7 +65,7 @@ def fetch_tradingview_scanner(tickers):
         pass
     return {}
 
-# --- SIDEBAR TETAPAN & KALKULATOR POSISI ---
+# --- SIDEBAR TETAPAN & KALKULATOR POSISI (MULTI-TP) ---
 st.sidebar.header("⚙️ Kriteria Tapisan")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
@@ -80,14 +80,15 @@ st.sidebar.header("🔔 Telegram Bot Alert")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
-# --- KALKULATOR SAIZ POSISI & RISIKO (LOT BURSA) ---
+# --- KALKULATOR SAIZ POSISI & RISIKO DENGAN MULTI-TP ---
 st.sidebar.markdown("---")
-st.sidebar.header("🧮 Kalkulator Saiz Posisi & Risiko")
+st.sidebar.header("🧮 Kalkulator Risiko & Multi-TP")
 calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
 calc_risk_pct = st.sidebar.slider("Risiko Maksimum (% dari Modal):", 1.0, 5.0, 2.0, 0.5)
 calc_entry = st.sidebar.number_input("Harga Beli (Entry) (RM):", value=1.00, step=0.01)
 calc_sl = st.sidebar.number_input("Harga Stop-Loss (SL) (RM):", value=0.92, step=0.01)
-calc_tp = st.sidebar.number_input("Harga Target (TP) (RM):", value=1.20, step=0.01)
+calc_tp1 = st.sidebar.number_input("Target 1 (TP1 - 50% Lot):", value=1.10, step=0.01)
+calc_tp2 = st.sidebar.number_input("Target 2 (TP2 - 50% Lot):", value=1.25, step=0.01)
 
 if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
     max_risk_rm = calc_capital * (calc_risk_pct / 100.0)
@@ -96,21 +97,26 @@ if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
     suggested_shares = max(100, int(raw_shares // 100) * 100)
     total_investment = suggested_shares * calc_entry
     actual_risk_rm = suggested_shares * risk_per_share
-    potential_profit = suggested_shares * (calc_tp - calc_entry) if calc_tp > calc_entry else 0
-    risk_reward_ratio = (calc_tp - calc_entry) / risk_per_share if risk_per_share > 0 else 0
+    
+    half_shares = suggested_shares // 2
+    profit_tp1 = half_shares * (calc_tp1 - calc_entry) if calc_tp1 > calc_entry else 0
+    profit_tp2 = half_shares * (calc_tp2 - calc_entry) if calc_tp2 > calc_entry else 0
+    total_potential_profit = profit_tp1 + profit_tp2
+    rr_ratio = (calc_tp2 - calc_entry) / risk_per_share if risk_per_share > 0 else 0
     
     st.sidebar.markdown(f"""
     <div style="background-color: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px;">
-        <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Keputusan Pengiraan (Lot Bursa):</p>
-        <p style="margin:2px 0;">📦 <b>Jumlah Unit Saham:</b> {suggested_shares:,} unit ({suggested_shares//100} Lot)</p>
-        <p style="margin:2px 0;">💰 <b>Jumlah Modal Diguna:</b> RM {total_investment:,.2f}</p>
-        <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Sebenar:</b> RM {actual_risk_rm:,.2f}</p>
-        <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi Untung (TP):</b> RM {potential_profit:,.2f}</p>
-        <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R:</b> 1 : {risk_reward_ratio:.2f}</p>
+        <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Pengiraan Multi-TP (Lot Bursa):</p>
+        <p style="margin:2px 0;">📦 <b>Jumlah Saham:</b> {suggested_shares:,} unit ({suggested_shares//100} Lot)</p>
+        <p style="margin:2px 0;">💰 <b>Modal Diguna:</b> RM {total_investment:,.2f}</p>
+        <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Maks:</b> RM {actual_risk_rm:,.2f}</p>
+        <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi TP1:</b> RM {profit_tp1:,.2f}</p>
+        <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi TP2:</b> RM {profit_tp2:,.2f}</p>
+        <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R (TP2):</b> 1 : {rr_ratio:.2f}</p>
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.sidebar.warning("Sila pastikan Harga Entry lebih tinggi daripada Harga Stop-Loss.")
+    st.sidebar.warning("Sila pastikan Harga Entry lebih tinggi daripada Stop-Loss.")
 
 def send_telegram_message(token, chat_id, message):
     try:
@@ -125,89 +131,82 @@ def send_telegram_message(token, chat_id, message):
 def analyze_chart_bob_bod(api_key, image, trend, price):
     try:
         client = OpenAI(api_key=api_key)
-        
         if image.mode in ("RGBA", "P"):
             image = image.convert("RGB")
-            
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG")
         base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         prompt = (
-            f"Anda adalah seorang Ketua Penganalisis Teknikal pasaran Bursa Malaysia yang pakar dalam strategi swing trading **Buy on Breakout (BOB)** dan **Buy on Dip (BOD)**. "
-            f"Pengguna menetapkan arah tuju umum carta sebagai '{trend}' dengan anggaran harga semasa sekitar RM {price}. "
-            f"Sila teliti imej carta yang dimuat naik dengan teliti dan berikan laporan terperinci dalam Bahasa Melayu mengikut struktur berikut:\n\n"
-            f"1. **Analisis Hala Tuju & Pergerakan Carta:** Huraikan struktur fasa pasaran semasa (adakah fasa pengumpulan, kenaikan sihat, atau keletihan) serta kedudukan harga berbanding purata pergerakan/trendline.\n"
-            f"2. **Penilaian Potensi Setup (BOB vs BOD):** \n"
-            f"   - Adakah carta ini menunjukkan ciri-ciri **BOB (Breakout)** (harga menghampiri rintangan utama dengan volum menyokong)?\n"
-            f"   - Atau ciri-ciri **BOD (Dip/Reversal)** (harga membuat susut nilai/pullback sihat ke zon sokongan dengan volume mengecil dan tanda pembalikan)?\n"
-            f"3. **Zon Harga Kritikal & Pengurusan Risiko:**\n"
-            f"   - Sokongan Kuat (Stop-Loss sah)\n"
-            f"   - Sokongan Terdekat\n"
-            f"   - Rintangan Terdekat\n"
-            f"   - Sasaran Harga (Target Price - TP)\n"
-            f"4. **Cadangan Taktikal & Status Watchlist:** Berikan panduan tindakan sama ada kaunter ini layak masuk senarai tumpuan segera (*High Watchlist*), tunggu pengesahan, atau elakkan."
+            f"Anda adalah Ketua Penganalisis Teknikal Bursa Malaysia pakar strategi BOB & BOD. "
+            f"Trend asas: '{trend}', Harga Semasa: RM {price}. "
+            f"Sila beri laporan dalam Bahasa Melayu merangkumi:\n"
+            f"1. Analisis Hala Tuju & Struktur Fasa.\n"
+            f"2. Penilaian Potensi Setup (BOB vs BOD).\n"
+            f"3. Zon Harga Kritikal (Stop-Loss, Sokongan, Rintangan, TP1 & TP2).\n"
+            f"4. Cadangan Taktikal Watchlist."
         )
-        
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                ]
+            }],
             max_tokens=800
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"⚠️ Ralat menyambung ke OpenAI API: {str(e)}"
+        return f"⚠️ Ralat OpenAI API: {str(e)}"
 
 # --- SESSION STATE INITIALIZATION ---
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
 if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
+if "watchlist" not in st.session_state:
+    st.session_state.watchlist = []
 
 # --- NAVIGASI MOD UTAMA ---
 app_mode = st.radio(
     "Pilih Mod Utama Sistem:", 
     [
         "🔍 Screener & Prestasi Sektor", 
-        "📸 AI Chart Vision (BOB/BOD Analisis)", 
-        "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)"
+        "📸 AI Chart Vision (BOB/BOD)", 
+        "⭐ Watchlist Peribadi",
+        "🔗 Pautan Rasmi Bursa"
     ], 
     horizontal=True
 )
 st.markdown("---")
 
-if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
+if app_mode == "🔗 Pautan Rasmi Bursa":
     st.subheader("🔗 Rujukan Pantas Data Rasmi Pasaran")
-    st.markdown("Klik pautan di bawah untuk terus merujuk data sahih di platform rasmi Bursa Malaysia dan KLSE Screener.")
-    
     st.markdown("""
     <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d;">
         <h3 style="color: #58a6ff; margin-top:0;">📌 Pautan Rasmi Pasaran Saham</h3>
-        <p>Pilih platform rujukan di bawah:</p>
         <ul>
-            <li>👉 <a href="https://www.bursamalaysia.com/" target="_blank"><b>Bursa Malaysia Official Portal</b></a></li>
+            <li>👉 <a href="https://www.bursamalaysia.com/" target="_blank"><b>Bursa Malaysia Portal</b></a></li>
             <li>👉 <a href="https://www.klsescreener.com/" target="_blank"><b>KLSE Screener Portal</b></a></li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
-elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
-    st.subheader("📸 Modul Analisis AI Khusus Teknik BOB & BOD (OpenAI Vision)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda. Masukkan **OpenAI API Key** di *sidebar* sebelah kiri untuk membolehkan AI menilai potensi setup Buy on Breakout atau Buy on Dip secara profesional.")
-    
+elif app_mode == "⭐ Watchlist Peribadi":
+    st.subheader("⭐ Senarai Tontonan Peribadi (My Watchlist & Notes)")
+    if st.session_state.watchlist:
+        wl_df = pd.DataFrame(st.session_state.watchlist)
+        st.dataframe(wl_df, use_container_width=True, hide_index=True)
+        if st.button("🗑️ Kosongkan Watchlist"):
+            st.session_state.watchlist = []
+            st.rerun()
+    else:
+        st.info("Tiada kaunter dalam watchlist. Anda boleh menambah kaunter daripada hasil imbasan screener di tab utama.")
+
+elif app_mode == "📸 AI Chart Vision (BOB/BOD)":
+    st.subheader("📸 Modul Analisis AI Khusus Teknik BOB & BOD")
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
     if uploaded_chart is not None:
@@ -215,29 +214,22 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
         with col_img:
             image = Image.open(uploaded_chart)
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
-            
         with col_settings:
             st.markdown("### 🤖 Tetapan Penilaian AI:")
-            selected_trend = st.selectbox(
-                "📈 Jangkaan Hala Tuju Asas Carta:",
-                ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Tekanan)", "⚖️ Sideway / Konsolidasi Tapak"]
-            )
-            est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
-            
-            run_ai_analysis = st.button("✨ Analisis Setup BOB / BOD Sekarang", type="primary", use_container_width=True)
+            selected_trend = st.selectbox("Hala Tuju Asas:", ["🚀 Uptrend", "📉 Downtrend", "⚖️ Sideway"])
+            est_current_price = st.number_input("Harga Semasa (RM):", value=0.95, step=0.01)
+            run_ai_analysis = st.button("✨ Analisis Setup BOB / BOD", type="primary", use_container_width=True)
             
         st.markdown("---")
-        
         if run_ai_analysis:
             if not openai_api_key:
-                st.error("⚠️ Sila masukkan **OpenAI API Key** anda di ruangan *sidebar* sebelah kiri terlebih dahulu!")
+                st.error("⚠️ Sila masukkan OpenAI API Key di sidebar!")
             else:
-                with st.spinner("🤖 OpenAI sedang meneliti pergerakan carta & menilai potensi setup BOB/BOD..."):
+                with st.spinner("🤖 OpenAI sedang menilai carta..."):
                     ai_report = analyze_chart_bob_bod(openai_api_key, image, selected_trend, est_current_price)
-                    
                 st.markdown(f"""
                 <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; width: 100%;">
-                    <h3 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis Taktikal BOB & BOD (AI)</h3>
+                    <h3 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis Taktikal AI</h3>
                     <hr style="border-color: #30363d;">
                     <div style="color: #c9d1d9; line-height: 1.7; font-size: 15px;">
                         {ai_report.replace(chr(10), '<br>')}
@@ -247,15 +239,15 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
 
 else:
     # --- MOD SCREENER & SEKTOR ---
-    scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor / Manual Kaunter"], horizontal=True)
+    scan_mode = st.radio("Pilih Mod Imbasan:", ["🤖 Imbas Automatik Seluruh Pasaran", "📂 Imbas Mengikut Sektor"], horizontal=True)
 
-    if scan_mode == "📂 Imbas Mengikut Sektor / Manual Kaunter":
+    if scan_mode == "📂 Imbas Mengikut Sektor":
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             sel_sector = st.selectbox("Pilih Sektor:", list(sector_benchmarks.keys()))
             default_t = ", ".join(sector_benchmarks[sel_sector])
         with col_m2:
-            custom_input = st.text_area("Atau Edit Kod Kaunter (Koma):", value=default_t, height=75)
+            custom_input = st.text_area("Kod Kaunter:", value=default_t, height=75)
             target_tickers = [t.strip().upper().replace('.KL', '') for t in custom_input.split(",") if t.strip()]
     else:
         target_tickers = master_bursa_tickers
@@ -286,52 +278,46 @@ else:
                     elif change > 0:
                         signal = "📈 Momentum"
                     else:
-                        signal = "📉 Tapak / Pullback"
+                        signal = "📉 Pullback"
                     
-                    sec_name = ticker_to_sector.get(t, "Am / Lain-lain")
-                    
+                    sec_name = ticker_to_sector.get(t, "Lain-lain")
                     item_data = {
                         "Kaunter": t,
                         "Sektor": sec_name,
                         "Harga (RM)": entry_price,
                         "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                         "RSI": round(rsi_val, 1),
-                        "Setup Strategi": signal,
+                        "Setup": signal,
                         "Volum": f"{vol:,.0f}"
                     }
                     scan_results.append(item_data)
                     raw_tickers.append(t)
                     
                     if "BOB" in signal or "BOD" in signal:
-                        alert_messages.append(f"• *{t}* ({sec_name}) | Harga: RM {entry_price} | Setup: {signal} | Vol: {vol:,.0f}")
+                        alert_messages.append(f"• *{t}* ({sec_name}) | RM {entry_price} | {signal} | Vol: {vol:,.0f}")
                     
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
         
         if alert_messages and telegram_token and telegram_chat_id:
-            full_msg = f"🚨 *MYX SWING ENTRY ALERT* 🚨\nSistem mengesan kaunter berpotensi tinggi:\n" + "\n".join(alert_messages)
-            success = send_telegram_message(telegram_token, telegram_chat_id, full_msg)
-            if success:
-                st.toast("✅ Setup entry alert berjaya dihantar ke Telegram anda!", icon="🚀")
+            full_msg = f"🚨 *MYX SWING ENTRY ALERT* 🚨\nSistem mengesan kaunter berpotensi:\n" + "\n".join(alert_messages)
+            send_telegram_message(telegram_token, telegram_chat_id, full_msg)
 
-    # --- PAPAN PENDAHUDU SEKTOR ---
-    st.subheader("📊 Prestasi Sektor Semasa (Sector Leadership)")
+    # Prestasi Sektor
+    st.subheader("📊 Prestasi Sektor Semasa")
     sector_perf = []
     for sec_name, t_list in sector_benchmarks.items():
         sec_data = fetch_tradingview_scanner(t_list)
         sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
         avg_ret = np.mean(sec_changes) if sec_changes else 0.0
-        status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah / Pullback")
+        status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah")
         sector_perf.append({
             "Sektor Pasaran": sec_name,
-            "Avg Ret": avg_ret,
             "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
             "Status Trend": status_trend
         })
-
     if sector_perf:
-        perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
-        st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(sector_perf), use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
@@ -340,6 +326,18 @@ else:
         df_display = pd.DataFrame(st.session_state.scan_results)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
+        # Butang untuk simpan ke Watchlist
+        st.markdown("### ⭐ Simpan ke Watchlist Peribadi:")
+        selected_to_wl = st.selectbox("Pilih kaunter untuk dimasukkan ke Watchlist:", st.session_state.raw_tickers)
+        if st.button("➕ Tambah ke Watchlist"):
+            # Cari data kaunter tersebut
+            match_item = next((item for item in st.session_state.scan_results if item["Kaunter"] == selected_to_wl), None)
+            if match_item and match_item not in st.session_state.watchlist:
+                st.session_state.watchlist.append(match_item)
+                st.success(f"✅ {selected_to_wl} berjaya dimasukkan ke Watchlist!")
+            else:
+                st.warning("Kaunter sudah ada dalam Watchlist.")
+
         st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
         cols_tv = st.columns(6)
         for i, t_name in enumerate(st.session_state.raw_tickers):
@@ -351,4 +349,4 @@ else:
         csv_data = df_display.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
     else:
-        st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
+        st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** untuk memaparkan senarai kaunter.")
