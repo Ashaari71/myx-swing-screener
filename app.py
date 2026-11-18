@@ -208,12 +208,13 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
     if uploaded_chart is not None:
-        col_img1, col_img2 = st.columns([1, 1])
-        with col_img1:
+        # Susunan Lebar Penuh (Atas: Imej & Tetapan, Bawah: Laporan Analisis Lebar Penuh)
+        col_img, col_settings = st.columns([1, 1])
+        with col_img:
             image = Image.open(uploaded_chart)
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
-        with col_img2:
+        with col_settings:
             st.markdown("### 🤖 Tetapan Penilaian AI:")
             selected_trend = st.selectbox(
                 "📈 Jangkaan Hala Tuju Asas Carta:",
@@ -223,22 +224,25 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
             
             run_ai_analysis = st.button("✨ Analisis Setup BOB / BOD Sekarang", type="primary", use_container_width=True)
             
-            if run_ai_analysis:
-                if not openai_api_key:
-                    st.error("⚠️ Sila masukkan **OpenAI API Key** anda di ruangan *sidebar* sebelah kiri terlebih dahulu!")
-                else:
-                    with st.spinner("🤖 OpenAI sedang meneliti pergerakan carta & menilai potensi setup BOB/BOD..."):
-                        ai_report = analyze_chart_bob_bod(openai_api_key, image, selected_trend, est_current_price)
-                        
-                    st.markdown(f"""
-                    <div style="background-color: #161b22; padding: 22px; border-radius: 10px; border: 1px solid #30363d; margin-top: 15px;">
-                        <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis Taktikal BOB & BOD (AI)</h4>
-                        <hr style="border-color: #30363d;">
-                        <div style="color: #c9d1d9; line-height: 1.6;">
-                            {ai_report.replace(chr(10), '<br>')}
-                        </div>
+        st.markdown("---")
+        
+        if run_ai_analysis:
+            if not openai_api_key:
+                st.error("⚠️ Sila masukkan **OpenAI API Key** anda di ruangan *sidebar* sebelah kiri terlebih dahulu!")
+            else:
+                with st.spinner("🤖 OpenAI sedang meneliti pergerakan carta & menilai potensi setup BOB/BOD..."):
+                    ai_report = analyze_chart_bob_bod(openai_api_key, image, selected_trend, est_current_price)
+                    
+                # Paparan Kotak Laporan Lebar Penuh (Full Width)
+                st.markdown(f"""
+                <div style="background-color: #161b22; padding: 25px; border-radius: 10px; border: 1px solid #30363d; width: 100%;">
+                    <h3 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis Taktikal BOB & BOD (AI)</h3>
+                    <hr style="border-color: #30363d;">
+                    <div style="color: #c9d1d9; line-height: 1.7; font-size: 15px;">
+                        {ai_report.replace(chr(10), '<br>')}
                     </div>
-                    """, unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
 else:
     # --- MOD SCREENER & SEKTOR ---
