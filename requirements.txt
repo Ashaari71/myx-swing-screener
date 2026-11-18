@@ -4,3 +4,5 @@ numpy
 requests
 Pillow
 openai
+APScheduler
+pytz
