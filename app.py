@@ -15,8 +15,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, AI Vision (OpenAI) & Pautan Rasmi")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector (OpenAI GPT-4 Vision) & Rujukan Pantas")
+st.title("📈 MYX Swing Pro: Screener, AI Vision BOB/BOD & Pautan Rasmi")
+st.markdown("Sistem Imbasan Automatik, AI Chart Inspector Khusus Teknik BOB/BOD & Rujukan Pantas Bursa")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -77,7 +77,7 @@ st.sidebar.header("🔔 Telegram Bot Alert")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
-# --- KALKULATOR SAIZ POSISI & RISIKO ---
+# --- KALKULATOR SAIZ POSISI & RISIKO (LOT BURSA) ---
 st.sidebar.markdown("---")
 st.sidebar.header("🧮 Kalkulator Saiz Posisi & Risiko")
 calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
@@ -118,12 +118,11 @@ def send_telegram_message(token, chat_id, message):
     except Exception:
         return False
 
-# --- FUNGSI ANALISIS OPENAI VISION ---
-def analyze_chart_with_openai(api_key, image, trend, price):
+# --- FUNGSI ANALISIS OPENAI VISION KHUSUS BOB & BOD ---
+def analyze_chart_bob_bod(api_key, image, trend, price):
     try:
         client = OpenAI(api_key=api_key)
         
-        # Tukar imej kepada mod RGB (mengelakkan ralat RGBA transparent to JPEG)
         if image.mode in ("RGBA", "P"):
             image = image.convert("RGB")
             
@@ -132,14 +131,19 @@ def analyze_chart_with_openai(api_key, image, trend, price):
         base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         prompt = (
-            f"Anda adalah seorang penganalisis teknikal saham profesional khusus untuk pasaran Bursa Malaysia (strategi Swing Trading, BOB, BOD). "
-            f"Pengguna menetapkan status trend semasa sebagai '{trend}' dengan anggaran harga semasa pada carta sekitar RM {price}. "
-            f"Sila teliti imej carta yang diberikan dan berikan laporan analisis yang padu dan profesional merangkumi:\n"
-            f"1. Penilaian struktur harga & volum semasa.\n"
-            f"2. Cadangan zon Sokongan Kuat (Stop-Loss).\n"
-            f"3. Sokongan & Rintangan Terdekat.\n"
-            f"4. Target Price (TP).\n"
-            f"5. Cadangan taktikal kemasukan posisi (*entry strategy*)."
+            f"Anda adalah seorang Ketua Penganalisis Teknikal pasaran Bursa Malaysia yang pakar dalam strategi swing trading **Buy on Breakout (BOB)** dan **Buy on Dip (BOD)**. "
+            f"Pengguna menetapkan arah tuju umum carta sebagai '{trend}' dengan anggaran harga semasa sekitar RM {price}. "
+            f"Sila teliti imej carta yang dimuat naik dengan teliti dan berikan laporan terperinci dalam Bahasa Melayu mengikut struktur berikut:\n\n"
+            f"1. **Analisis Hala Tuju & Pergerakan Carta:** Huraikan struktur fasa pasaran semasa (adakah fasa pengumpulan, kenaikan sihat, atau keletihan) serta kedudukan harga berbanding purata pergerakan/trendline.\n"
+            f"2. **Penilaian Potensi Setup (BOB vs BOD):** \n"
+            f"   - Adakah carta ini menunjukkan ciri-ciri **BOB (Breakout)** (harga menghampiri rintangan utama dengan volum menyokong)?\n"
+            f"   - Atau ciri-ciri **BOD (Dip/Reversal)** (harga membuat susut nilai/pullback sihat ke zon sokongan dengan volume mengecil dan tanda pembalikan)?\n"
+            f"3. **Zon Harga Kritikal & Pengurusan Risiko:**\n"
+            f"   - Sokongan Kuat (Stop-Loss sah)\n"
+            f"   - Sokongan Terdekat\n"
+            f"   - Rintangan Terdekat\n"
+            f"   - Sasaran Harga (Target Price - TP)\n"
+            f"4. **Cadangan Taktikal & Status Watchlist:** Berikan panduan tindakan sama ada kaunter ini layak masuk senarai tumpuan segera (*High Watchlist*), tunggu pengesahan, atau elakkan."
         )
         
         response = client.chat.completions.create(
@@ -158,7 +162,7 @@ def analyze_chart_with_openai(api_key, image, trend, price):
                     ]
                 }
             ],
-            max_tokens=600
+            max_tokens=800
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -175,7 +179,7 @@ app_mode = st.radio(
     "Pilih Mod Utama Sistem:", 
     [
         "🔍 Screener & Prestasi Sektor", 
-        "📸 AI Chart Vision (OpenAI) & Analisis Terperinci", 
+        "📸 AI Chart Vision (BOB/BOD Analisis)", 
         "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)"
     ], 
     horizontal=True
@@ -197,9 +201,9 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
     </div>
     """, unsafe_allow_html=True)
 
-elif app_mode == "📸 AI Chart Vision (OpenAI) & Analisis Terperinci":
-    st.subheader("📸 Modul Analisis Visual Imej Carta Berkuasa OpenAI GPT-4 Vision")
-    st.markdown("Muat naik *screenshot* carta TradingView anda. Masukkan **OpenAI API Key** di *sidebar* sebelah kiri untuk membolehkan AI membaca dan menganalisis carta anda secara langsung.")
+elif app_mode == "📸 AI Chart Vision (BOB/BOD Analisis)":
+    st.subheader("📸 Modul Analisis AI Khusus Teknik BOB & BOD (OpenAI Vision)")
+    st.markdown("Muat naik *screenshot* carta TradingView anda. Masukkan **OpenAI API Key** di *sidebar* sebelah kiri untuk membolehkan AI menilai potensi setup Buy on Breakout atau Buy on Dip secara profesional.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -210,25 +214,25 @@ elif app_mode == "📸 AI Chart Vision (OpenAI) & Analisis Terperinci":
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
         with col_img2:
-            st.markdown("### 🤖 Tetapan Analisis AI:")
+            st.markdown("### 🤖 Tetapan Penilaian AI:")
             selected_trend = st.selectbox(
-                "📈 Tentukan Jangkaan Trend Asas:",
-                ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan)", "⚖️ Sideway (Konsolidasi Tapak)"]
+                "📈 Jangkaan Hala Tuju Asas Carta:",
+                ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Tekanan)", "⚖️ Sideway / Konsolidasi Tapak"]
             )
-            est_current_price = st.number_input("Masukkan Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
+            est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
             
-            run_ai_analysis = st.button("✨ Jalankan Analisis OpenAI Vision", type="primary", use_container_width=True)
+            run_ai_analysis = st.button("✨ Analisis Setup BOB / BOD Sekarang", type="primary", use_container_width=True)
             
             if run_ai_analysis:
                 if not openai_api_key:
                     st.error("⚠️ Sila masukkan **OpenAI API Key** anda di ruangan *sidebar* sebelah kiri terlebih dahulu!")
                 else:
-                    with st.spinner("🤖 OpenAI sedang meneliti struktur carta dan menjana ulasan taktikal..."):
-                        ai_report = analyze_chart_with_openai(openai_api_key, image, selected_trend, est_current_price)
+                    with st.spinner("🤖 OpenAI sedang meneliti pergerakan carta & menilai potensi setup BOB/BOD..."):
+                        ai_report = analyze_chart_bob_bod(openai_api_key, image, selected_trend, est_current_price)
                         
                     st.markdown(f"""
                     <div style="background-color: #161b22; padding: 22px; border-radius: 10px; border: 1px solid #30363d; margin-top: 15px;">
-                        <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Rasmi OpenAI Vision AI</h4>
+                        <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Analisis Taktikal BOB & BOD (AI)</h4>
                         <hr style="border-color: #30363d;">
                         <div style="color: #c9d1d9; line-height: 1.6;">
                             {ai_report.replace(chr(10), '<br>')}
