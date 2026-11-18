@@ -6,6 +6,8 @@ import base64
 import io
 from PIL import Image
 from openai import OpenAI
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
@@ -15,8 +17,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, Advanced Filters, AI Vision & Watchlist")
-st.markdown("Sistem Imbasan Automatik, Penapis MACD/BB Squeeze, AI Chart Inspector & Pengurusan Multi-TP")
+st.title("📈 MYX Swing Pro: Auto Scheduler, Screener, AI Vision & Watchlist")
+st.markdown("Sistem Imbasan Automatik Berjadual, Penapis MACD/BB Squeeze, AI Chart Inspector & Multi-TP")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -37,7 +39,7 @@ for sec_name, t_list in sector_benchmarks.items():
     master_bursa_tickers.extend(t_list)
 master_bursa_tickers = list(set(master_bursa_tickers))
 
-# --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API (DENGAN MACD & BB) ---
+# --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
 def fetch_tradingview_scanner(tickers):
     formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
     url = "https://scanner.tradingview.com/malaysia/scan"
@@ -69,6 +71,51 @@ def fetch_tradingview_scanner(tickers):
         pass
     return {}
 
+# --- FUNGSI IMBASAN LATAR BELAKANG (BACKGROUND SCHEDULER JOB) ---
+def background_scan_job():
+    try:
+        tv_results = fetch_tradingview_scanner(master_bursa_tickers)
+        alert_messages = []
+        for t in master_bursa_tickers:
+            if t in tv_results:
+                info = tv_results[t]
+                price = info["close"]
+                change = info["change"]
+                rsi_val = info["rsi"]
+                vol = info["volume"]
+                
+                if price >= 0.50 and rsi_val <= 80 and change >= -3.0:
+                    if change >= 2.0 and vol > 500000:
+                        signal = "🔥 BOB (Breakout)"
+                    elif change >= -1.5 and change < 2.0 and vol > 300000:
+                        signal = "🔄 BOD (Dip/Reversal)"
+                    else:
+                        continue
+                    sec_name = ticker_to_sector.get(t, "Lain-lain")
+                    alert_messages.append(f"• *{t}* ({sec_name}) | RM {price:.2f} | {signal} | Vol: {vol:,.0f}")
+        
+        # Ambil token dari st.secrets (pastikan diset di Streamlit Cloud Secrets)
+        token = st.secrets.get("TELEGRAM_TOKEN", "")
+        chat_id = st.secrets.get("TELEGRAM_CHAT_ID", "")
+        if alert_messages and token and chat_id:
+            full_msg = f"🚨 *MYX AUTOMATED SCHEDULED ALERT* 🚨\nSistem mengesan setup berpotensi tinggi:\n" + "\n".join(alert_messages)
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            requests.post(url, json={"chat_id": chat_id, "text": full_msg, "parse_mode": "Markdown"})
+    except Exception as e:
+        print(f"Background job error: {e}")
+
+# Mulakan Background Scheduler sekali sahaja menggunakan st.cache_resource
+@st.cache_resource
+def start_scheduler():
+    scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kuala_Lumpur"))
+    # Imbasan automatik setiap hari bekerja pada jam 9:00 pagi (Buka Pasaran) & 5:00 petang (Tutup Pasaran)
+    scheduler.add_job(background_scan_job, 'cron', hour=9, minute=0, day_of_week='mon-fri')
+    scheduler.add_job(background_scan_job, 'cron', hour=17, minute=0, day_of_week='mon-fri')
+    scheduler.start()
+    return scheduler
+
+start_scheduler()
+
 # --- SIDEBAR TETAPAN & PENAPIS LANJUTAN ---
 st.sidebar.header("⚙️ Kriteria Tapisan Asas")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
@@ -85,7 +132,7 @@ st.sidebar.header("🤖 OpenAI API Tetapan")
 openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password", placeholder="sk-...")
 
 st.sidebar.markdown("---")
-st.sidebar.header("🔔 Telegram Bot Alert")
+st.sidebar.header("🔔 Telegram Bot Alert (Manual Test)")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
@@ -281,15 +328,12 @@ else:
                 bb_up = info["bb_upper"]
                 bb_low = info["bb_lower"]
                 
-                # Asas Tapisan Harga & RSI
                 if price < min_price or rsi_val > max_rsi or change < min_change_pct:
                     continue
                 
-                # Penapisan Lanjutan: MACD Crossover
                 if filter_macd and macd <= macd_sig:
                     continue
                 
-                # Penapisan Lanjutan: Bollinger Bands Squeeze (Lebar band < 8% dari harga)
                 if filter_bb_squeeze:
                     bb_width = (bb_up - bb_low) / price if price > 0 else 1.0
                     if bb_width > 0.08:
