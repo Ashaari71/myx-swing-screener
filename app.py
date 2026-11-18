@@ -321,4 +321,22 @@ else:
         perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
         st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
 
-    st.markdown("
+    st.markdown("---")
+
+    if st.session_state.scan_results:
+        st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
+        df_display = pd.DataFrame(st.session_state.scan_results)
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        
+        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
+        cols_tv = st.columns(6)
+        for i, t_name in enumerate(st.session_state.raw_tickers):
+            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+            with cols_tv[i % 6]:
+                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+                
+        st.markdown("---")
+        csv_data = df_display.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
+    else:
+        st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
