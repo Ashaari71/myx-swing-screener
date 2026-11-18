@@ -15,8 +15,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, AI Vision BOB/BOD & Watchlist")
-st.markdown("Sistem Imbasan Automatik, AI Chart Inspector, Watchlist Peribadi & Pengurusan Risiko Multi-TP")
+st.title("📈 MYX Swing Pro: Screener, Advanced Filters, AI Vision & Watchlist")
+st.markdown("Sistem Imbasan Automatik, Penapis MACD/BB Squeeze, AI Chart Inspector & Pengurusan Multi-TP")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -37,13 +37,13 @@ for sec_name, t_list in sector_benchmarks.items():
     master_bursa_tickers.extend(t_list)
 master_bursa_tickers = list(set(master_bursa_tickers))
 
-# --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
+# --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API (DENGAN MACD & BB) ---
 def fetch_tradingview_scanner(tickers):
     formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
     url = "https://scanner.tradingview.com/malaysia/scan"
     payload = {
         "symbols": {"tickers": formatted_symbols},
-        "columns": ["close", "change", "volume", "RSI"]
+        "columns": ["close", "change", "volume", "RSI", "MACD.macd", "MACD.signal", "BB.upper", "BB.lower"]
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
@@ -58,18 +58,27 @@ def fetch_tradingview_scanner(tickers):
                     "close": vals[0] if vals[0] is not None else 0.0,
                     "change": vals[1] if vals[1] is not None else 0.0,
                     "volume": vals[2] if vals[2] is not None else 0,
-                    "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0
+                    "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
+                    "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
+                    "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
+                    "bb_upper": vals[6] if len(vals) > 6 and vals[6] is not None else 0.0,
+                    "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
                 }
             return results
     except Exception:
         pass
     return {}
 
-# --- SIDEBAR TETAPAN & KALKULATOR POSISI (MULTI-TP) ---
-st.sidebar.header("⚙️ Kriteria Tapisan")
+# --- SIDEBAR TETAPAN & PENAPIS LANJUTAN ---
+st.sidebar.header("⚙️ Kriteria Tapisan Asas")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
 max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
 min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -3.0, 0.5)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🎛️ Penapisan Indikator Lanjutan")
+filter_macd = st.sidebar.checkbox("Hanya MACD Bullish Crossover (MACD > Signal)", value=False)
+filter_bb_squeeze = st.sidebar.checkbox("Hanya Bollinger Bands Squeeze (Konsolidasi Sempit)", value=False)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 OpenAI API Tetapan")
@@ -80,7 +89,7 @@ st.sidebar.header("🔔 Telegram Bot Alert")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
-# --- KALKULATOR SAIZ POSISI & RISIKO DENGAN MULTI-TP ---
+# --- KALKULATOR RISIKO & MULTI-TP ---
 st.sidebar.markdown("---")
 st.sidebar.header("🧮 Kalkulator Risiko & Multi-TP")
 calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
@@ -101,7 +110,6 @@ if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
     half_shares = suggested_shares // 2
     profit_tp1 = half_shares * (calc_tp1 - calc_entry) if calc_tp1 > calc_entry else 0
     profit_tp2 = half_shares * (calc_tp2 - calc_entry) if calc_tp2 > calc_entry else 0
-    total_potential_profit = profit_tp1 + profit_tp2
     rr_ratio = (calc_tp2 - calc_entry) / risk_per_share if risk_per_share > 0 else 0
     
     st.sidebar.markdown(f"""
@@ -195,7 +203,7 @@ if app_mode == "🔗 Pautan Rasmi Bursa":
     """, unsafe_allow_html=True)
 
 elif app_mode == "⭐ Watchlist Peribadi":
-    st.subheader("⭐ Senarai Tontonan Peribadi (My Watchlist & Notes)")
+    st.subheader("⭐ Senarai Tontonan Peribadi (My Watchlist)")
     if st.session_state.watchlist:
         wl_df = pd.DataFrame(st.session_state.watchlist)
         st.dataframe(wl_df, use_container_width=True, hide_index=True)
@@ -203,7 +211,7 @@ elif app_mode == "⭐ Watchlist Peribadi":
             st.session_state.watchlist = []
             st.rerun()
     else:
-        st.info("Tiada kaunter dalam watchlist. Anda boleh menambah kaunter daripada hasil imbasan screener di tab utama.")
+        st.info("Tiada kaunter dalam watchlist. Tambah kaunter daripada hasil imbasan screener di tab utama.")
 
 elif app_mode == "📸 AI Chart Vision (BOB/BOD)":
     st.subheader("📸 Modul Analisis AI Khusus Teknik BOB & BOD")
@@ -268,33 +276,50 @@ else:
                 change = info["change"]
                 rsi_val = info["rsi"]
                 vol = info["volume"]
+                macd = info["macd"]
+                macd_sig = info["macd_signal"]
+                bb_up = info["bb_upper"]
+                bb_low = info["bb_lower"]
                 
-                if price >= min_price and rsi_val <= max_rsi and change >= min_change_pct:
-                    entry_price = round(price, 2)
-                    if change >= 2.0 and vol > 500000:
-                        signal = "🔥 BOB (Breakout)"
-                    elif change >= -1.5 and change < 2.0 and vol > 300000:
-                        signal = "🔄 BOD (Dip/Reversal)"
-                    elif change > 0:
-                        signal = "📈 Momentum"
-                    else:
-                        signal = "📉 Pullback"
-                    
-                    sec_name = ticker_to_sector.get(t, "Lain-lain")
-                    item_data = {
-                        "Kaunter": t,
-                        "Sektor": sec_name,
-                        "Harga (RM)": entry_price,
-                        "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
-                        "RSI": round(rsi_val, 1),
-                        "Setup": signal,
-                        "Volum": f"{vol:,.0f}"
-                    }
-                    scan_results.append(item_data)
-                    raw_tickers.append(t)
-                    
-                    if "BOB" in signal or "BOD" in signal:
-                        alert_messages.append(f"• *{t}* ({sec_name}) | RM {entry_price} | {signal} | Vol: {vol:,.0f}")
+                # Asas Tapisan Harga & RSI
+                if price < min_price or rsi_val > max_rsi or change < min_change_pct:
+                    continue
+                
+                # Penapisan Lanjutan: MACD Crossover
+                if filter_macd and macd <= macd_sig:
+                    continue
+                
+                # Penapisan Lanjutan: Bollinger Bands Squeeze (Lebar band < 8% dari harga)
+                if filter_bb_squeeze:
+                    bb_width = (bb_up - bb_low) / price if price > 0 else 1.0
+                    if bb_width > 0.08:
+                        continue
+                
+                entry_price = round(price, 2)
+                if change >= 2.0 and vol > 500000:
+                    signal = "🔥 BOB (Breakout)"
+                elif change >= -1.5 and change < 2.0 and vol > 300000:
+                    signal = "🔄 BOD (Dip/Reversal)"
+                elif change > 0:
+                    signal = "📈 Momentum"
+                else:
+                    signal = "📉 Pullback"
+                
+                sec_name = ticker_to_sector.get(t, "Lain-lain")
+                item_data = {
+                    "Kaunter": t,
+                    "Sektor": sec_name,
+                    "Harga (RM)": entry_price,
+                    "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
+                    "RSI": round(rsi_val, 1),
+                    "Setup": signal,
+                    "Volum": f"{vol:,.0f}"
+                }
+                scan_results.append(item_data)
+                raw_tickers.append(t)
+                
+                if "BOB" in signal or "BOD" in signal:
+                    alert_messages.append(f"• *{t}* ({sec_name}) | RM {entry_price} | {signal} | Vol: {vol:,.0f}")
                     
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
@@ -326,11 +351,9 @@ else:
         df_display = pd.DataFrame(st.session_state.scan_results)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         
-        # Butang untuk simpan ke Watchlist
         st.markdown("### ⭐ Simpan ke Watchlist Peribadi:")
         selected_to_wl = st.selectbox("Pilih kaunter untuk dimasukkan ke Watchlist:", st.session_state.raw_tickers)
         if st.button("➕ Tambah ke Watchlist"):
-            # Cari data kaunter tersebut
             match_item = next((item for item in st.session_state.scan_results if item["Kaunter"] == selected_to_wl), None)
             if match_item and match_item not in st.session_state.watchlist:
                 st.session_state.watchlist.append(match_item)
@@ -349,4 +372,4 @@ else:
         csv_data = df_display.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
     else:
-        st.info("👈 Klik butang **Mula Imbas Pasaran Sekarang** untuk memaparkan senarai kaunter.")
+        st.info("👈 Pilih penapis di sidebar dan klik **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
