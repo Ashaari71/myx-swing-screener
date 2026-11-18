@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
+import base64
+import io
 from PIL import Image
+from openai import OpenAI
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
@@ -12,8 +15,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📈 MYX Swing Pro: Screener, AI Chart Vision & Pautan Rasmi")
-st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector & Rujukan Pantas Bursa / KLSE")
+st.title("📈 MYX Swing Pro: Screener, AI Vision (OpenAI) & Pautan Rasmi")
+st.markdown("Sistem Imbasan Automatik BOB/BOD, AI Chart Inspector (OpenAI GPT-4 Vision) & Rujukan Pantas")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -66,11 +69,15 @@ max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
 min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -3.0, 0.5)
 
 st.sidebar.markdown("---")
+st.sidebar.header("🤖 OpenAI API Tetapan")
+openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password", placeholder="sk-...")
+
+st.sidebar.markdown("---")
 st.sidebar.header("🔔 Telegram Bot Alert")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
 
-# --- KALKULATOR SAIZ POSISI & RISIKO (MENGIKUT LOT BURSA MALAYSIA) ---
+# --- KALKULATOR SAIZ POSISI & RISIKO ---
 st.sidebar.markdown("---")
 st.sidebar.header("🧮 Kalkulator Saiz Posisi & Risiko")
 calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
@@ -111,6 +118,48 @@ def send_telegram_message(token, chat_id, message):
     except Exception:
         return False
 
+# --- FUNGSI ANALISIS OPENAI VISION ---
+def analyze_chart_with_openai(api_key, image, trend, price):
+    try:
+        client = OpenAI(api_key=api_key)
+        
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        
+        prompt = (
+            f"Anda adalah seorang penganalisis teknikal saham profesional khusus untuk pasaran Bursa Malaysia (strategi Swing Trading, BOB, BOD). "
+            f"Pengguna menetapkan status trend semasa sebagai '{trend}' dengan anggaran harga semasa pada carta sekitar RM {price}. "
+            f"Sila teliti imej carta yang diberikan dan berikan laporan analisis yang padu dan profesional merangkumi:\n"
+            f"1. Penilaian struktur harga & volum semasa.\n"
+            f"2. Cadangan zon Sokongan Kuat (Stop-Loss).\n"
+            f"3. Sokongan & Rintangan Terdekat.\n"
+            f"4. Target Price (TP).\n"
+            f"5. Cadangan taktikal kemasukan posisi (*entry strategy*)."
+        )
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini", # Model pantas & cekap untuk imej dan teks
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=600
+        }
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Ralat menyambung ke OpenAI API: {str(e)}"
+
 # --- SESSION STATE INITIALIZATION ---
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
@@ -122,7 +171,7 @@ app_mode = st.radio(
     "Pilih Mod Utama Sistem:", 
     [
         "🔍 Screener & Prestasi Sektor", 
-        "📸 AI Chart Image Scanner & Analisis Terperinci", 
+        "📸 AI Chart Vision (OpenAI) & Analisis Terperinci", 
         "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)"
     ], 
     horizontal=True
@@ -144,9 +193,9 @@ if app_mode == "🔗 Pautan Pantas Data Rasmi (Bursa & KLSE)":
     </div>
     """, unsafe_allow_html=True)
 
-elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
-    st.subheader("📸 Modul Analisis Visual Imej Carta (AI Chart Inspector)")
-    st.markdown("Muat naik *screenshot* carta TradingView anda untuk paparan struktur harga dan rumusan analisis AI yang padu.")
+elif app_mode == "📸 AI Chart Vision (OpenAI) & Analisis Terperinci":
+    st.subheader("📸 Modul Analisis Visual Imej Carta Berkuasa OpenAI GPT-4 Vision")
+    st.markdown("Muat naik *screenshot* carta TradingView anda. Masukkan **OpenAI API Key** di *sidebar* sebelah kiri untuk membolehkan AI membaca dan menganalisis carta anda secara langsung.")
     
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
     
@@ -157,59 +206,31 @@ elif app_mode == "📸 AI Chart Image Scanner & Analisis Terperinci":
             st.image(image, caption="Carta Dimuat Naik", use_column_width=True)
             
         with col_img2:
-            st.markdown("### 🤖 Rumusan Taktikal & Analisis Padu AI:")
+            st.markdown("### 🤖 Tetapan Analisis AI:")
             selected_trend = st.selectbox(
-                "📈 Tentukan Status Trend Semasa Carta:",
-                ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan / Tekanan Jualan)", "⚖️ Sideway (Fasa Tapak / Mendatar Konsolidasi)"]
+                "📈 Tentukan Jangkaan Trend Asas:",
+                ["🚀 Uptrend (Fasa Kenaikan Kuat)", "📉 Downtrend (Fasa Penurunan)", "⚖️ Sideway (Konsolidasi Tapak)"]
             )
-            est_current_price = st.number_input("Masukkan Anggaran Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
+            est_current_price = st.number_input("Masukkan Harga Semasa (RM) pada Carta:", value=0.95, step=0.01)
             
-            # Pengiraan paras rujukan yang sepadan
-            if "Uptrend" in selected_trend:
-                sokongan_kuat = round(est_current_price * 0.88, 2)
-                sokongan_terdekat = round(est_current_price * 0.94, 2)
-                rintangan_terdekat = round(est_current_price * 1.06, 2)
-                target_price = round(est_current_price * 1.15, 2)
-                
-                cohesive_comment = f"""
-                <b>Analisis Menyeluruh:</b> Pergerakan carta semasa berada dalam fasa <b>Uptrend</b> yang sihat pada harga RM {est_current_price:.2f}. Struktur pasaran menunjukkan momentum pembeli masih menguasai keadaan. 
-                <br><br>
-                <b>Pelan Taktikal:</b> Anda boleh merancang kemasukan (*entry*) sekiranya berlaku penurunan sihat (*pullback*) menghampiri zon <b>Sokongan Terdekat di RM {sokongan_terdekat}</b>, atau menunggu pengesahan pecah rintangan (*breakout*) di atas <b>RM {rintangan_terdekat}</b> dengan sokongan volum tinggi. Letakkan benteng pertahanan (*stop-loss*) di bawah paras <b>Sokongan Kuat RM {sokongan_kuat}</b> dan sasarkan keuntungan di <b>RM {target_price}</b>.
-                """
-            elif "Downtrend" in selected_trend:
-                sokongan_kuat = round(est_current_price * 0.80, 2)
-                sokongan_terdekat = round(est_current_price * 0.90, 2)
-                rintangan_terdekat = round(est_current_price * 1.03, 2)
-                target_price = round(est_current_price * 1.10, 2)
-                
-                cohesive_comment = f"""
-                <b>Analisis Menyeluruh:</b> Carta menunjukkan fasa <b>Downtrend</b> di mana tekanan jualan masih menguasai struktur harga di sekitar RM {est_current_price:.2f}. Risiko penurunan lanjutan adalah tinggi selagi tiada tanda pembalikan arah.
-                <br><br>
-                <b>Pelan Taktikal:</b> Elakkan daripada membeli secara melulu (*catching falling knives*). Tunggu sehingga harga menguji zon <b>Sokongan Terdekat RM {sokongan_terdekat}</b> atau <b>Sokongan Kuat RM {sokongan_kuat}</b> dan pastikan wujud lilin lantunan (*reversal candlestick*) berserta volum besar sebelum mempertimbangkan sebarang risiko pembelian.
-                """
-            else:
-                sokongan_kuat = round(est_current_price * 0.85, 2)
-                sokongan_terdekat = round(est_current_price * 0.93, 2)
-                rintangan_terdekat = round(est_current_price * 1.05, 2)
-                target_price = round(est_current_price * 1.12, 2)
-                
-                cohesive_comment = f"""
-                <b>Analisis Menyeluruh:</b> Harga semasa RM {est_current_price:.2f} bergerak dalam fasa <b>Sideway (Konsolidasi Tapak)</b>, menunjukkan proses pengumpulan tenaga oleh pelabur besar sebelum arah pasaran seterusnya ditentukan.
-                <br><br>
-                <b>Pelan Taktikal:</b> Fasa ini sesuai untuk pemantauan rapi (*watchlist*). Sediakan amaran harga berhampiran <b>Rintangan Terdekat RM {rintangan_terdekat}</b>. Masuk posisi beli sekiranya berlaku lonjakan volum ketara memecahkan rintangan tersebut, dengan kawalan risiko ketat di bawah <b>Sokongan Terdekat RM {sokongan_terdekat}</b>.
-                """
-
-            st.markdown(f"""
-            <div style="background-color: #161b22; padding: 22px; border-radius: 10px; border: 1px solid #30363d;">
-                <h4 style="color: #58a6ff; margin-top:0;">📊 Rumusan & Pelan Taktikal AI</h4>
-                <p style="color: #f85149; margin: 3px 0;">🛡️ <b>Sokongan Kuat (Stop-Loss):</b> <b>RM {sokongan_kuat}</b></p>
-                <p style="color: #ff7b72; margin: 3px 0;">📉 <b>Sokongan Terdekat:</b> <b>RM {sokongan_terdekat}</b></p>
-                <p style="color: #ffa657; margin: 3px 0;">🚧 <b>Rintangan Terdekat:</b> <b>RM {rintangan_terdekat}</b></p>
-                <p style="color: #3fb950; margin: 3px 0;">🎯 <b>Target Price (TP):</b> <b>RM {target_price}</b></p>
-                <hr style="border-color: #30363d;">
-                <p style="color: #c9d1d9; line-height: 1.5; margin-bottom: 0;">{cohesive_comment}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            run_ai_analysis = st.button("✨ Jalankan Analisis OpenAI Vision", type="primary", use_container_width=True)
+            
+            if run_ai_analysis:
+                if not openai_api_key:
+                    st.error("⚠️ Sila masukkan **OpenAI API Key** anda di ruangan *sidebar* sebelah kiri terlebih dahulu!")
+                else:
+                    with st.spinner("🤖 OpenAI sedang meneliti struktur carta dan menjana ulasan taktikal..."):
+                        ai_report = analyze_chart_with_openai(openai_api_key, image, selected_trend, est_current_price)
+                        
+                    st.markdown(f"""
+                    <div style="background-color: #161b22; padding: 22px; border-radius: 10px; border: 1px solid #30363d; margin-top: 15px;">
+                        <h4 style="color: #58a6ff; margin-top:0;">📊 Laporan Rasmi OpenAI Vision AI</h4>
+                        <hr style="border-color: #30363d;">
+                        <div style="color: #c9d1d9; line-height: 1.6;">
+                            {ai_report.replace(chr(10), '<br>')}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 else:
     # --- MOD SCREENER & SEKTOR ---
@@ -307,7 +328,7 @@ else:
         cols_tv = st.columns(6)
         for i, t_name in enumerate(st.session_state.raw_tickers):
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[i % 6]:
+            with cols_tv[i%6]:
                 st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
                 
         st.markdown("---")
