@@ -313,4 +313,12 @@ else:
         sector_perf.append({
             "Sektor Pasaran": sec_name,
             "Avg Ret": avg_ret,
-            "Prestasi (%)": f"{'+' if avg_ret>=0
+            "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+            "Status Trend": status_trend
+        })
+
+    if sector_perf:
+        perf_df = pd.DataFrame(sector_perf).sort_values(by="Avg Ret", ascending=False)
+        st.dataframe(perf_df[["Sektor Pasaran", "Prestasi (%)", "Status Trend"]], use_container_width=True, hide_index=True)
+
+    st.markdown("
