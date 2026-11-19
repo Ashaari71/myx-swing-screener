@@ -185,4 +185,48 @@ openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password", placeh
 st.sidebar.markdown("---")
 st.sidebar.header("🔔 Telegram Bot Alert (Manual Test)")
 telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
-telegram_chat_id = st.sidebar.
+telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
+
+# --- KALKULATOR RISIKO & MULTI-TP ---
+st.sidebar.markdown("---")
+st.sidebar.header("🧮 Kalkulator Risiko & Multi-TP")
+calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
+calc_risk_pct = st.sidebar.slider("Risiko Maksimum (% dari Modal):", 1.0, 5.0, 2.0, 0.5)
+calc_entry = st.sidebar.number_input("Harga Beli (Entry) (RM):", value=1.00, step=0.01)
+calc_sl = st.sidebar.number_input("Harga Stop-Loss (SL) (RM):", value=0.92, step=0.01)
+calc_tp1 = st.sidebar.number_input("Target 1 (TP1 - 50% Lot):", value=1.10, step=0.01)
+calc_tp2 = st.sidebar.number_input("Target 2 (TP2 - 50% Lot):", value=1.25, step=0.01)
+
+if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
+    max_risk_rm = calc_capital * (calc_risk_pct / 100.0)
+    risk_per_share = calc_entry - calc_sl
+    raw_shares = max_risk_rm / risk_per_share
+    suggested_shares = max(100, int(raw_shares // 100) * 100)
+    total_investment = suggested_shares * calc_entry
+    actual_risk_rm = suggested_shares * risk_per_share
+
+    half_shares = suggested_shares // 2
+    profit_tp1 = half_shares * (calc_tp1 - calc_entry) if calc_tp1 > calc_entry else 0
+    profit_tp2 = half_shares * (calc_tp2 - calc_entry) if calc_tp2 > calc_entry else 0
+    rr_ratio = (calc_tp2 - calc_entry) / risk_per_share if risk_per_share > 0 else 0
+
+    st.sidebar.markdown(f"""
+    <div style="background-color: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px;">
+        <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Pengiraan Multi-TP (Lot Bursa):</p>
+        <p style="margin:2px 0;">📦 <b>Jumlah Saham:</b> {suggested_shares:,} unit ({suggested_shares//100} Lot)</p>
+        <p style="margin:2px 0;">💰 <b>Modal Diguna:</b> RM {total_investment:,.2f}</p>
+        <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Maks:</b> RM {actual_risk_rm:,.2f}</p>
+        <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi TP1:</b> RM {profit_tp1:,.2f}</p>
+        <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi TP2:</b> RM {profit_tp2:,.2f}</p>
+        <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R (TP2):</b> 1 : {rr_ratio:.2f}</p>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.sidebar.warning("Sila pastikan Harga Entry lebih tinggi daripada Stop-Loss.")
+
+
+def send_telegram_message(token, chat_id, message):
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+        response = requests.post(url,
