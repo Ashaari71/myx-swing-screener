@@ -218,15 +218,4 @@ if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
         <p style="color: #f85149; margin:2px 0;">⚠️ <b>Risiko Maks:</b> RM {actual_risk_rm:,.2f}</p>
         <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi TP1:</b> RM {profit_tp1:,.2f}</p>
         <p style="color: #3fb950; margin:2px 0;">🎯 <b>Potensi TP2:</b> RM {profit_tp2:,.2f}</p>
-        <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R (TP2):</b> 1 : {rr_ratio:.2f}</p>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.sidebar.warning("Sila pastikan Harga Entry lebih tinggi daripada Stop-Loss.")
-
-
-def send_telegram_message(token, chat_id, message):
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-        response = requests.post(url,
+        <p style="color: #e3b341; margin:2px 0;">⚖️ <b>Nisbah R:R (TP2):</b>
