@@ -18,7 +18,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Auto Scheduler, Screener, AI Vision & Watchlist")
-st.markdown("Sistem Imbasan Automatik Berjadual, Penapis MACD/BB Squeeze, AI Chart Inspector & Multi-TP")
+st.markdown("Sistem Imbasan Automatik Berjadual, Penapis Uptrend (EMA20/EMA50/RSI) & MACD/BB Squeeze, AI Chart Inspector & Multi-TP")
 
 # --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
@@ -39,13 +39,18 @@ for sec_name, t_list in sector_benchmarks.items():
     master_bursa_tickers.extend(t_list)
 master_bursa_tickers = list(set(master_bursa_tickers))
 
+
 # --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
 def fetch_tradingview_scanner(tickers):
     formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
     url = "https://scanner.tradingview.com/malaysia/scan"
     payload = {
         "symbols": {"tickers": formatted_symbols},
-        "columns": ["close", "change", "volume", "RSI", "MACD.macd", "MACD.signal", "BB.upper", "BB.lower"]
+        "columns": [
+            "close", "change", "volume", "RSI",
+            "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
+            "EMA20", "EMA50"
+        ]
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
@@ -56,20 +61,42 @@ def fetch_tradingview_scanner(tickers):
             for item in data.get("data", []):
                 sym = item["s"].replace("MYX:", "")
                 vals = item["d"]
+                close_val = vals[0] if len(vals) > 0 and vals[0] is not None else 0.0
+                ema20_val = vals[8] if len(vals) > 8 and vals[8] is not None else 0.0
+                ema50_val = vals[9] if len(vals) > 9 and vals[9] is not None else 0.0
                 results[sym] = {
-                    "close": vals[0] if vals[0] is not None else 0.0,
-                    "change": vals[1] if vals[1] is not None else 0.0,
-                    "volume": vals[2] if vals[2] is not None else 0,
+                    "close": close_val,
+                    "change": vals[1] if len(vals) > 1 and vals[1] is not None else 0.0,
+                    "volume": vals[2] if len(vals) > 2 and vals[2] is not None else 0,
                     "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
                     "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
                     "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
                     "bb_upper": vals[6] if len(vals) > 6 and vals[6] is not None else 0.0,
                     "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
+                    "ema20": ema20_val,
+                    "ema50": ema50_val,
                 }
             return results
     except Exception:
         pass
     return {}
+
+
+def semak_uptrend_menaik(info, rsi_min=50.0, rsi_max=80.0):
+    """
+    Menyemak sama ada kaunter berada dalam fasa uptrend menaik:
+    - Harga semasa berada di atas EMA20 dan EMA20 berada di atas EMA50
+    - RSI berada dalam julat menaik yang ditetapkan
+    """
+    harga = info.get("close", 0.0)
+    ema20 = info.get("ema20", 0.0)
+    ema50 = info.get("ema50", 0.0)
+    rsi_val = info.get("rsi", 0.0)
+
+    ema_valid = (ema20 > 0) and (ema50 > 0) and (harga > ema20) and (ema20 > ema50)
+    rsi_valid = (rsi_val >= rsi_min) and (rsi_val <= rsi_max)
+    return ema_valid and rsi_valid
+
 
 # --- FUNGSI IMBASAN LATAR BELAKANG (BACKGROUND SCHEDULER JOB) ---
 def background_scan_job():
@@ -83,44 +110,52 @@ def background_scan_job():
                 change = info["change"]
                 rsi_val = info["rsi"]
                 vol = info["volume"]
-                
-                if price >= 0.50 and rsi_val <= 80 and change >= -3.0:
+
+                is_uptrend = semak_uptrend_menaik(info, rsi_min=50.0, rsi_max=80.0)
+                if price >= 0.50 and is_uptrend and change >= -2.0:
                     if change >= 2.0 and vol > 500000:
-                        signal = "🔥 BOB (Breakout)"
+                        signal = "🔥 Uptrend + Momentum Kuat (Kaji BOB)"
                     elif change >= -1.5 and change < 2.0 and vol > 300000:
-                        signal = "🔄 BOD (Dip/Reversal)"
+                        signal = "🔄 Uptrend + Pullback/Reversal (Kaji BOD)"
                     else:
-                        continue
+                        signal = "📈 Uptrend Menaik"
                     sec_name = ticker_to_sector.get(t, "Lain-lain")
-                    alert_messages.append(f"• *{t}* ({sec_name}) | RM {price:.2f} | {signal} | Vol: {vol:,.0f}")
-        
-        # Ambil token dari st.secrets (pastikan diset di Streamlit Cloud Secrets)
+                    alert_messages.append(
+                        f"• *{t}* ({sec_name}) | RM {price:.2f} | RSI {rsi_val:.1f} | {signal} | Vol: {vol:,.0f}"
+                    )
+
         token = st.secrets.get("TELEGRAM_TOKEN", "")
         chat_id = st.secrets.get("TELEGRAM_CHAT_ID", "")
         if alert_messages and token and chat_id:
-            full_msg = f"🚨 *MYX AUTOMATED SCHEDULED ALERT* 🚨\nSistem mengesan setup berpotensi tinggi:\n" + "\n".join(alert_messages)
+            full_msg = (
+                "🚨 *MYX AUTOMATED SCHEDULED ALERT (UPTREND)* 🚨\n"
+                "Kaunter uptrend menaik berpotensi untuk dikaji pada carta:\n"
+                + "\n".join(alert_messages)
+            )
             url = f"https://api.telegram.org/bot{token}/sendMessage"
-            requests.post(url, json={"chat_id": chat_id, "text": full_msg, "parse_mode": "Markdown"})
+            requests.post(url, json={"chat_id": chat_id, "text": full_msg, "parse_mode": "Markdown"}, timeout=10)
     except Exception as e:
         print(f"Background job error: {e}")
 
-# Mulakan Background Scheduler sekali sahaja menggunakan st.cache_resource
+
 @st.cache_resource
 def start_scheduler():
     scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kuala_Lumpur"))
-    # Imbasan automatik setiap hari bekerja pada jam 9:00 pagi (Buka Pasaran) & 5:00 petang (Tutup Pasaran)
     scheduler.add_job(background_scan_job, 'cron', hour=9, minute=0, day_of_week='mon-fri')
     scheduler.add_job(background_scan_job, 'cron', hour=17, minute=0, day_of_week='mon-fri')
     scheduler.start()
     return scheduler
+
 
 start_scheduler()
 
 # --- SIDEBAR TETAPAN & PENAPIS LANJUTAN ---
 st.sidebar.header("⚙️ Kriteria Tapisan Asas")
 min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
+filter_uptrend_only = st.sidebar.checkbox("Hanya Uptrend Menaik (Harga > EMA20 > EMA50)", value=True)
+min_rsi = st.sidebar.slider("Had Minimum RSI (Uptrend)", 30, 65, 50, 1)
 max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
-min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -3.0, 0.5)
+min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -2.0, 0.5)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🎛️ Penapisan Indikator Lanjutan")
@@ -153,12 +188,12 @@ if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
     suggested_shares = max(100, int(raw_shares // 100) * 100)
     total_investment = suggested_shares * calc_entry
     actual_risk_rm = suggested_shares * risk_per_share
-    
+
     half_shares = suggested_shares // 2
     profit_tp1 = half_shares * (calc_tp1 - calc_entry) if calc_tp1 > calc_entry else 0
     profit_tp2 = half_shares * (calc_tp2 - calc_entry) if calc_tp2 > calc_entry else 0
     rr_ratio = (calc_tp2 - calc_entry) / risk_per_share if risk_per_share > 0 else 0
-    
+
     st.sidebar.markdown(f"""
     <div style="background-color: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d; font-size: 13px;">
         <p style="color: #58a6ff; margin:0 0 5px 0; font-weight:bold;">📊 Pengiraan Multi-TP (Lot Bursa):</p>
@@ -173,14 +208,16 @@ if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
 else:
     st.sidebar.warning("Sila pastikan Harga Entry lebih tinggi daripada Stop-Loss.")
 
+
 def send_telegram_message(token, chat_id, message):
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, timeout=10)
         return response.status_code == 200
     except Exception:
         return False
+
 
 # --- FUNGSI ANALISIS OPENAI VISION KHUSUS BOB & BOD ---
 def analyze_chart_bob_bod(api_key, image, trend, price):
@@ -191,13 +228,15 @@ def analyze_chart_bob_bod(api_key, image, trend, price):
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG")
         base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        
+
         prompt = (
             f"Anda adalah Ketua Penganalisis Teknikal Bursa Malaysia pakar strategi BOB & BOD. "
             f"Trend asas: '{trend}', Harga Semasa: RM {price}. "
+            f"Nilai struktur carta dahulu sama ada benar-benar uptrend menaik atau sideway/downtrend, "
+            f"kemudian pilih pendekatan BOB atau BOD mengikut kesesuaian carta semasa. "
             f"Sila beri laporan dalam Bahasa Melayu merangkumi:\n"
             f"1. Analisis Hala Tuju & Struktur Fasa.\n"
-            f"2. Penilaian Potensi Setup (BOB vs BOD).\n"
+            f"2. Penilaian Kesesuaian Setup (BOB vs BOD mengikut carta).\n"
             f"3. Zon Harga Kritikal (Stop-Loss, Sokongan, Rintangan, TP1 & TP2).\n"
             f"4. Cadangan Taktikal Watchlist."
         )
@@ -216,6 +255,7 @@ def analyze_chart_bob_bod(api_key, image, trend, price):
     except Exception as e:
         return f"⚠️ Ralat OpenAI API: {str(e)}"
 
+
 # --- SESSION STATE INITIALIZATION ---
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
@@ -223,16 +263,18 @@ if "raw_tickers" not in st.session_state:
     st.session_state.raw_tickers = []
 if "watchlist" not in st.session_state:
     st.session_state.watchlist = []
+if "sector_perf" not in st.session_state:
+    st.session_state.sector_perf = []
 
 # --- NAVIGASI MOD UTAMA ---
 app_mode = st.radio(
-    "Pilih Mod Utama Sistem:", 
+    "Pilih Mod Utama Sistem:",
     [
-        "🔍 Screener & Prestasi Sektor", 
-        "📸 AI Chart Vision (BOB/BOD)", 
+        "🔍 Screener & Prestasi Sektor",
+        "📸 AI Chart Vision (BOB/BOD)",
         "⭐ Watchlist Peribadi",
         "🔗 Pautan Rasmi Bursa"
-    ], 
+    ],
     horizontal=True
 )
 st.markdown("---")
@@ -263,7 +305,7 @@ elif app_mode == "⭐ Watchlist Peribadi":
 elif app_mode == "📸 AI Chart Vision (BOB/BOD)":
     st.subheader("📸 Modul Analisis AI Khusus Teknik BOB & BOD")
     uploaded_chart = st.file_uploader("Pilih fail imej carta (PNG, JPG, JPEG):", type=["png", "jpg", "jpeg"])
-    
+
     if uploaded_chart is not None:
         col_img, col_settings = st.columns([1, 1])
         with col_img:
@@ -274,7 +316,7 @@ elif app_mode == "📸 AI Chart Vision (BOB/BOD)":
             selected_trend = st.selectbox("Hala Tuju Asas:", ["🚀 Uptrend", "📉 Downtrend", "⚖️ Sideway"])
             est_current_price = st.number_input("Harga Semasa (RM):", value=0.95, step=0.01)
             run_ai_analysis = st.button("✨ Analisis Setup BOB / BOD", type="primary", use_container_width=True)
-            
+
         st.markdown("---")
         if run_ai_analysis:
             if not openai_api_key:
@@ -315,7 +357,7 @@ else:
         scan_results = []
         raw_tickers = []
         alert_messages = []
-        
+
         for t in target_tickers:
             if t in tv_results:
                 info = tv_results[t]
@@ -327,66 +369,81 @@ else:
                 macd_sig = info["macd_signal"]
                 bb_up = info["bb_upper"]
                 bb_low = info["bb_lower"]
-                
+                ema20 = info["ema20"]
+                ema50 = info["ema50"]
+
                 if price < min_price or rsi_val > max_rsi or change < min_change_pct:
                     continue
-                
+
+                is_uptrend = semak_uptrend_menaik(info, rsi_min=min_rsi, rsi_max=max_rsi)
+                if filter_uptrend_only and not is_uptrend:
+                    continue
+
                 if filter_macd and macd <= macd_sig:
                     continue
-                
+
                 if filter_bb_squeeze:
                     bb_width = (bb_up - bb_low) / price if price > 0 else 1.0
                     if bb_width > 0.08:
                         continue
-                
+
                 entry_price = round(price, 2)
-                if change >= 2.0 and vol > 500000:
-                    signal = "🔥 BOB (Breakout)"
-                elif change >= -1.5 and change < 2.0 and vol > 300000:
-                    signal = "🔄 BOD (Dip/Reversal)"
-                elif change > 0:
-                    signal = "📈 Momentum"
+                if is_uptrend and change >= 2.0 and vol > 500000:
+                    fokus_kajian = "🚀 Uptrend + Momentum (Kaji BOB pada Carta)"
+                elif is_uptrend and -1.5 <= change < 2.0 and vol > 300000:
+                    fokus_kajian = "🔄 Uptrend + Pullback (Kaji BOD pada Carta)"
+                elif is_uptrend:
+                    fokus_kajian = "📈 Uptrend Menaik (Kaji BOB/BOD ikut Carta)"
                 else:
-                    signal = "📉 Pullback"
-                
+                    fokus_kajian = "⚖️ Bukan Uptrend Penuh (Perlu Semak Carta)"
+
                 sec_name = ticker_to_sector.get(t, "Lain-lain")
                 item_data = {
                     "Kaunter": t,
                     "Sektor": sec_name,
                     "Harga (RM)": entry_price,
+                    "EMA20": round(ema20, 2) if ema20 > 0 else "-",
+                    "EMA50": round(ema50, 2) if ema50 > 0 else "-",
                     "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
-                    "Setup": signal,
+                    "Status & Fokus": fokus_kajian,
                     "Volum": f"{vol:,.0f}"
                 }
                 scan_results.append(item_data)
                 raw_tickers.append(t)
-                
-                if "BOB" in signal or "BOD" in signal:
-                    alert_messages.append(f"• *{t}* ({sec_name}) | RM {entry_price} | {signal} | Vol: {vol:,.0f}")
-                    
+
+                if is_uptrend:
+                    alert_messages.append(
+                        f"• *{t}* ({sec_name}) | RM {entry_price:.2f} | RSI {rsi_val:.1f} | {fokus_kajian}"
+                    )
+
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
-        
+
         if alert_messages and telegram_token and telegram_chat_id:
-            full_msg = f"🚨 *MYX SWING ENTRY ALERT* 🚨\nSistem mengesan kaunter berpotensi:\n" + "\n".join(alert_messages)
+            full_msg = "🚨 *MYX UPTREND SCREENER ALERT* 🚨\nKaunter lulus uptrend menaik:\n" + "\n".join(alert_messages)
             send_telegram_message(telegram_token, telegram_chat_id, full_msg)
+
+        # Kemas kini Prestasi Sektor setiap kali imbasan dijalankan
+        sector_perf = []
+        for sec_name, t_list in sector_benchmarks.items():
+            sec_data = fetch_tradingview_scanner(t_list)
+            sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+            avg_ret = np.mean(sec_changes) if sec_changes else 0.0
+            status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah")
+            sector_perf.append({
+                "Sektor Pasaran": sec_name,
+                "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
+                "Status Trend": status_trend
+            })
+        st.session_state.sector_perf = sector_perf
 
     # Prestasi Sektor
     st.subheader("📊 Prestasi Sektor Semasa")
-    sector_perf = []
-    for sec_name, t_list in sector_benchmarks.items():
-        sec_data = fetch_tradingview_scanner(t_list)
-        sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
-        avg_ret = np.mean(sec_changes) if sec_changes else 0.0
-        status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah")
-        sector_perf.append({
-            "Sektor Pasaran": sec_name,
-            "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-            "Status Trend": status_trend
-        })
-    if sector_perf:
-        st.dataframe(pd.DataFrame(sector_perf), use_container_width=True, hide_index=True)
+    if st.session_state.sector_perf:
+        st.dataframe(pd.DataFrame(st.session_state.sector_perf), use_container_width=True, hide_index=True)
+    else:
+        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk memuatkan prestasi sektor terkini dan menapis kaunter uptrend menaik.")
 
     st.markdown("---")
 
@@ -394,7 +451,7 @@ else:
         st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
         df_display = pd.DataFrame(st.session_state.scan_results)
         st.dataframe(df_display, use_container_width=True, hide_index=True)
-        
+
         st.markdown("### ⭐ Simpan ke Watchlist Peribadi:")
         selected_to_wl = st.selectbox("Pilih kaunter untuk dimasukkan ke Watchlist:", st.session_state.raw_tickers)
         if st.button("➕ Tambah ke Watchlist"):
@@ -411,9 +468,9 @@ else:
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
             with cols_tv[i % 6]:
                 st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
-                
+
         st.markdown("---")
         csv_data = df_display.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
     else:
-        st.info("👈 Pilih penapis di sidebar dan klik **Mula Imbas Pasaran Sekarang** di atas untuk memaparkan senarai kaunter.")
+        st.info("👈 Pilih penapis di sidebar (seperti **Hanya Uptrend Menaik**, **Had Minimum RSI**, atau **MACD/BB Squeeze**) dan klik **Mula Imbas Pasaran Sekarang** di atas.")
