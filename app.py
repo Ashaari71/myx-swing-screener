@@ -163,6 +163,4 @@ def start_scheduler():
 start_scheduler()
 
 # --- SIDEBAR TETAPAN & PENAPIS LANJUTAN ---
-st.sidebar.header("⚙️ Kriteria Tapisan Asas")
-min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
-filter_shariah_
+st.sidebar.header
