@@ -154,40 +154,4 @@ def background_scan_job():
 @st.cache_resource
 def start_scheduler():
     scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kuala_Lumpur"))
-    scheduler.add_job(background_scan_job, "cron", hour=9, minute=0, day_of_week="mon-fri")
-    scheduler.add_job(background_scan_job, "cron", hour=17, minute=0, day_of_week="mon-fri")
-    scheduler.start()
-    return scheduler
-
-
-start_scheduler()
-
-# --- SIDEBAR TETAPAN & PENAPIS LANJUTAN ---
-st.sidebar.header("⚙️ Kriteria Tapisan Asas")
-min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
-filter_shariah_only = st.sidebar.checkbox("Tapis Keluar Saham Bukan Syariah (Bank/Konvensional)", value=True)
-filter_uptrend_only = st.sidebar.checkbox("Hanya Uptrend Menaik (Harga > EMA20 > EMA50)", value=True)
-min_rsi = st.sidebar.slider("Had Minimum RSI (Uptrend)", 30, 65, 50, 1)
-max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
-min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -2.0, 0.5)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🎛️ Penapisan Indikator & Volum")
-min_rvol = st.sidebar.slider("RVOL Minimum (10D) [0 = Semua, 1.2 = Sihat, 1.5 = Kuat]", 0.0, 3.0, 0.0, 0.1)
-filter_vol_higher = st.sidebar.checkbox("Hanya Volum > Volum Sebelumnya", value=False)
-filter_macd = st.sidebar.checkbox("Hanya MACD Bullish Crossover (MACD > Signal)", value=False)
-filter_bb_squeeze = st.sidebar.checkbox("Hanya Bollinger Bands Squeeze (Konsolidasi Sempit)", value=False)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🤖 OpenAI API Tetapan")
-openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password", placeholder="sk-...")
-
-st.sidebar.markdown("---")
-st.sidebar.header("🔔 Telegram Bot Alert (Manual Test)")
-telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
-telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
-
-# --- KALKULATOR RISIKO & MULTI-TP ---
-st.sidebar.markdown("---")
-st.sidebar.header("🧮 Kalkulator Risiko & Multi-TP")
-calc_
+    scheduler.add_job(background_scan_job, "cron
