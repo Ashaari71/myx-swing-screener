@@ -176,4 +176,18 @@ st.sidebar.header("🎛️ Penapisan Indikator & Volum")
 min_rvol = st.sidebar.slider("RVOL Minimum (10D) [0 = Semua, 1.2 = Sihat, 1.5 = Kuat]", 0.0, 3.0, 0.0, 0.1)
 filter_vol_higher = st.sidebar.checkbox("Hanya Volum > Volum Sebelumnya", value=False)
 filter_macd = st.sidebar.checkbox("Hanya MACD Bullish Crossover (MACD > Signal)", value=False)
-filter_bb_squeeze
+filter_bb_squeeze = st.sidebar.checkbox("Hanya Bollinger Bands Squeeze (Konsolidasi Sempit)", value=False)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🤖 OpenAI API Tetapan")
+openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password", placeholder="sk-...")
+
+st.sidebar.markdown("---")
+st.sidebar.header("🔔 Telegram Bot Alert (Manual Test)")
+telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
+telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
+
+# --- KALKULATOR RISIKO & MULTI-TP ---
+st.sidebar.markdown("---")
+st.sidebar.header("🧮 Kalkulator Risiko & Multi-TP")
+calc_
