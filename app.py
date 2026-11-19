@@ -14,19 +14,8 @@ except Exception:
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
-st.markdown(
-    """
-    <style>
-    .main { background-color: #0e1117; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
 st.title("📈 MYX Swing Pro: Screener, AI Vision & Watchlist")
-st.markdown(
-    "Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), Prestasi Sektor, AI Chart Inspector & Multi-TP"
-)
+st.caption("Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), Prestasi Sektor, AI Chart Inspector & Multi-TP")
 
 NON_SHARIAH_EXCLUDED = {
     "MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK",
@@ -36,12 +25,12 @@ NON_SHARIAH_EXCLUDED = {
 }
 
 sector_benchmarks = {
-    "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
-    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
-    "💻 Teknologi & Semikonduktor (Tech)": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX"],
-    "🏥 Penjagaan Kesihatan (Healthcare)": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
-    "🌾 Perladangan & Komoditi (Plantation)": ["KLK", "IOICORP", "FGV", "SIMEPROP"],
-    "⚙️ Perindustrian & Telco (Industrial/Telco)": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"],
+    "🔥 Pembinaan & Infrastruktur": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
+    "⚡ Tenaga Boleh Baharu & Utiliti": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
+    "💻 Teknologi & Semikonduktor": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX"],
+    "🏥 Penjagaan Kesihatan": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
+    "🌾 Perladangan & Komoditi": ["KLK", "IOICORP", "FGV", "SIMEPROP"],
+    "⚙️ Perindustrian & Telco": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"],
 }
 
 master_bursa_tickers = []
@@ -64,7 +53,7 @@ def fetch_tradingview_scanner(tickers):
             "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc",
         ],
     }
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=8)
         if response.status_code == 200:
@@ -83,8 +72,5 @@ def fetch_tradingview_scanner(tickers):
                     "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
                     "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
                     "bb_upper": vals[6] if len(vals) > 6 and vals[6] is not None else 0.0,
-                "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
-                "ema20": vals[8] if len(vals) > 8 and vals[8] is not None else 0.0,
-                "ema50": vals[9] if len(vals) > 9 and vals[9] is not None else 0.0,
-            }
-                    
+                    "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
+                    "ema20": vals[8] if len(vals) >
