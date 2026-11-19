@@ -18,7 +18,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 MYX Swing Pro: Auto Scheduler, Screener, AI Vision & Watchlist")
-st.markdown("Sistem Imbasan Automatik Berjadual, Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI), AI Chart Inspector & Multi-TP")
+st.markdown("Sistem Imbasan Automatik Berjadual, Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), AI Chart Inspector & Multi-TP")
 
 # --- SENARAI PENGECUALIAN KAUNTER BUKAN PATUH SYARIAH ---
 NON_SHARIAH_EXCLUDED = {
@@ -56,7 +56,7 @@ def fetch_tradingview_scanner(tickers):
         "columns": [
             "close", "change", "volume", "RSI",
             "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
-            "EMA20", "EMA50", "volume[1]",
+            "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc",
         ],
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -72,11 +72,13 @@ def fetch_tradingview_scanner(tickers):
                 ema20_val = vals[8] if len(vals) > 8 and vals[8] is not None else 0.0
                 ema50_val = vals[9] if len(vals) > 9 and vals[9] is not None else 0.0
                 prev_vol_val = vals[10] if len(vals) > 10 and vals[10] is not None else 0
+                rvol_val = vals[11] if len(vals) > 11 and vals[11] is not None else 0.0
                 results[sym] = {
                     "close": close_val,
                     "change": vals[1] if len(vals) > 1 and vals[1] is not None else 0.0,
                     "volume": vals[2] if len(vals) > 2 and vals[2] is not None else 0,
                     "prev_volume": prev_vol_val,
+                    "rvol": rvol_val,
                     "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
                     "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
                     "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
@@ -120,6 +122,7 @@ def background_scan_job():
                 change = info["change"]
                 rsi_val = info["rsi"]
                 vol = info["volume"]
+                rvol = info.get("rvol", 0.0)
 
                 is_uptrend = semak_uptrend_menaik(info, rsi_min=50.0, rsi_max=80.0)
                 if price >= 0.50 and is_uptrend and change >= -2.0:
@@ -131,7 +134,7 @@ def background_scan_job():
                         signal = "📈 Uptrend Menaik"
                     sec_name = ticker_to_sector.get(t, "Lain-lain")
                     alert_messages.append(
-                        f"• *{t}* ({sec_name}) | RM {price:.2f} | RSI {rsi_val:.1f} | {signal} | Vol: {vol:,.0f}"
+                        f"• *{t}* ({sec_name}) | RM {price:.2f} | RSI {rsi_val:.1f} | RVOL {rvol:.2f}x | {signal}"
                     )
 
         token = st.secrets.get("TELEGRAM_TOKEN", "")
@@ -170,6 +173,7 @@ min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -2.0, 
 
 st.sidebar.markdown("---")
 st.sidebar.header("🎛️ Penapisan Indikator Lanjutan")
+filter_vol_higher = st.sidebar.checkbox("Hanya Volum > Volum Sebelumnya", value=False)
 filter_macd = st.sidebar.checkbox("Hanya MACD Bullish Crossover (MACD > Signal)", value=False)
 filter_bb_squeeze = st.sidebar.checkbox("Hanya Bollinger Bands Squeeze (Konsolidasi Sempit)", value=False)
 
@@ -369,8 +373,7 @@ else:
 
     if run_scan:
         tv_results = fetch_tradingview_scanner(target_tickers)
-        scan_results = []
-        raw_tickers = []
+        scored_results = []
         alert_messages = []
 
         for t in target_tickers:
@@ -384,6 +387,7 @@ else:
                 rsi_val = info["rsi"]
                 vol = info["volume"]
                 prev_vol = info.get("prev_volume", 0)
+                rvol = info.get("rvol", 0.0)
                 macd = info["macd"]
                 macd_sig = info["macd_signal"]
                 bb_up = info["bb_upper"]
@@ -396,6 +400,10 @@ else:
 
                 is_uptrend = semak_uptrend_menaik(info, rsi_min=min_rsi, rsi_max=max_rsi)
                 if filter_uptrend_only and not is_uptrend:
+                    continue
+
+                vol_is_higher = (prev_vol > 0 and vol > prev_vol)
+                if filter_vol_higher and not vol_is_higher:
                     continue
 
                 if filter_macd and macd <= macd_sig:
@@ -416,7 +424,7 @@ else:
                 else:
                     fokus_kajian = "⚖️ Bukan Uptrend Penuh (Perlu Semak Carta)"
 
-                status_vol = "✅ Lebih Tinggi" if (prev_vol > 0 and vol > prev_vol) else "⚠️ Lebih Rendah"
+                status_vol = "✅ Lebih Tinggi" if vol_is_higher else "⚠️ Lebih Rendah"
                 sec_name = ticker_to_sector.get(t, "Lain-lain")
 
                 item_data = {
@@ -427,18 +435,27 @@ else:
                     "EMA50": round(ema50, 2) if ema50 > 0 else "-",
                     "Perubahan": f"{'+' if change >= 0 else ''}{change:.2f}%",
                     "RSI": round(rsi_val, 1),
+                    "RVOL (10D)": f"{rvol:.2f}x" if rvol > 0 else "-",
                     "Status & Fokus": fokus_kajian,
                     "Volum Sebelumnya": f"{prev_vol:,.0f}",
                     "Volum": f"{vol:,.0f}",
                     "Status Volum": status_vol,
                 }
-                scan_results.append(item_data)
-                raw_tickers.append(t)
+                # Skor keutamaan: volum lebih tinggi di atas, diikuti perubahan harian tertinggi
+                priority_key = (1 if vol_is_higher else 0, change, rvol)
+                scored_results.append((priority_key, t, item_data, is_uptrend, entry_price, rsi_val, rvol, status_vol, fokus_kajian, sec_name))
 
-                if is_uptrend:
-                    alert_messages.append(
-                        f"• *{t}* ({sec_name}) | RM {entry_price:.2f} | RSI {rsi_val:.1f} | {status_vol} | {fokus_kajian}"
-                    )
+        # Susun mengikut keutamaan tertinggi ke terendah
+        scored_results.sort(key=lambda x: x[0], reverse=True)
+
+        scan_results = [x[2] for x in scored_results]
+        raw_tickers = [x[1] for x in scored_results]
+
+        for _, t, _, is_uptrend, entry_price, rsi_val, rvol, status_vol, fokus_kajian, sec_name in scored_results:
+            if is_uptrend:
+                alert_messages.append(
+                    f"• *{t}* ({sec_name}) | RM {entry_price:.2f} | RSI {rsi_val:.1f} | RVOL {rvol:.2f}x | {status_vol} | {fokus_kajian}"
+                )
 
         st.session_state.scan_results = scan_results
         st.session_state.raw_tickers = raw_tickers
