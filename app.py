@@ -163,4 +163,14 @@ def start_scheduler():
 start_scheduler()
 
 # --- SIDEBAR TETAPAN & PENAPIS LANJUTAN ---
-st.sidebar.header
+st.sidebar.header("⚙️ Kriteria Tapisan Asas")
+min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
+filter_shariah_only = st.sidebar.checkbox("Tapis Keluar Saham Bukan Syariah (Bank/Konvensional)", value=True)
+filter_uptrend_only = st.sidebar.checkbox("Hanya Uptrend Menaik (Harga > EMA20 > EMA50)", value=True)
+min_rsi = st.sidebar.slider("Had Minimum RSI (Uptrend)", 30, 65, 50, 1)
+max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
+min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -2.0, 0.5)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🎛️ Penapisan Indikator & Volum")
+min_rvol = st.sidebar.slider("RVOL Minimum (10D) [0
