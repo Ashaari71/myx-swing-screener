@@ -20,16 +20,15 @@ st.markdown("""
 st.title("📈 MYX Swing Pro: Auto Scheduler, Screener, AI Vision & Watchlist")
 st.markdown("Sistem Imbasan Automatik Berjadual, Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI), AI Chart Inspector & Multi-TP")
 
-# --- SENARAI PENGECUALIAN KAUNTER BUKAN PATUH SYARIAH (BANK KONVENSIONAL / INSURANS / JUDI / ARAK / DLL) ---
-# Nota: Sentiasa semak senarai rasmi terkini Suruhanjaya Sekuriti Malaysia (SC) setiap Mei & November.
+# --- SENARAI PENGECUALIAN KAUNTER BUKAN PATUH SYARIAH ---
 NON_SHARIAH_EXCLUDED = {
     "MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK",
     "ABMB", "AFFIN", "MBSB", "BIMB", "HLFG", "LPI", "ALLIANZ",
     "TAKAFUL", "BURSA", "GENTING", "GENM", "MAGNUM", "SPTOTO",
-    "CARLSBG", "HEIM", "BAT", "ASTRO", "CAPITALA"
+    "CARLSBG", "HEIM", "BAT", "ASTRO", "CAPITALA",
 }
 
-# --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA (DITAPIS UNTUK PATUH SYARIAH) ---
+# --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
     "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
     "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
@@ -424,4 +423,78 @@ else:
                     "Kaunter": t,
                     "Sektor": sec_name,
                     "Harga (RM)": entry_price,
-                    "EMA20": round(ema2
+                    "EMA20": round(ema20, 2) if ema20 > 0 else "-",
+                    "EMA50": round(ema50, 2) if ema50 > 0 else "-",
+                    "Perubahan": f"{'+' if change >= 0 else ''}{change:.2f}%",
+                    "RSI": round(rsi_val, 1),
+                    "Status & Fokus": fokus_kajian,
+                    "Volum Sebelumnya": f"{prev_vol:,.0f}",
+                    "Volum": f"{vol:,.0f}",
+                    "Status Volum": status_vol,
+                }
+                scan_results.append(item_data)
+                raw_tickers.append(t)
+
+                if is_uptrend:
+                    alert_messages.append(
+                        f"• *{t}* ({sec_name}) | RM {entry_price:.2f} | RSI {rsi_val:.1f} | {status_vol} | {fokus_kajian}"
+                    )
+
+        st.session_state.scan_results = scan_results
+        st.session_state.raw_tickers = raw_tickers
+
+        if alert_messages and telegram_token and telegram_chat_id:
+            full_msg = "🚨 *MYX UPTREND SCREENER ALERT (SHARIAH)* 🚨\nKaunter lulus uptrend menaik:\n" + "\n".join(alert_messages)
+            send_telegram_message(telegram_token, telegram_chat_id, full_msg)
+
+        sector_perf = []
+        for sec_name, t_list in sector_benchmarks.items():
+            if filter_shariah_only:
+                t_list = [t for t in t_list if t not in NON_SHARIAH_EXCLUDED]
+            sec_data = fetch_tradingview_scanner(t_list)
+            sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
+            avg_ret = np.mean(sec_changes) if sec_changes else 0.0
+            status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah")
+            sector_perf.append({
+                "Sektor Pasaran": sec_name,
+                "Prestasi (%)": f"{'+' if avg_ret >= 0 else ''}{avg_ret:.2f}%",
+                "Status Trend": status_trend,
+            })
+        st.session_state.sector_perf = sector_perf
+
+    # Prestasi Sektor
+    st.subheader("📊 Prestasi Sektor Semasa")
+    if st.session_state.sector_perf:
+        st.dataframe(pd.DataFrame(st.session_state.sector_perf), use_container_width=True, hide_index=True)
+    else:
+        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk memuatkan prestasi sektor terkini dan menapis kaunter uptrend menaik.")
+
+    st.markdown("---")
+
+    if st.session_state.scan_results:
+        st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
+        df_display = pd.DataFrame(st.session_state.scan_results)
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+        st.markdown("### ⭐ Simpan ke Watchlist Peribadi:")
+        selected_to_wl = st.selectbox("Pilih kaunter untuk dimasukkan ke Watchlist:", st.session_state.raw_tickers)
+        if st.button("➕ Tambah ke Watchlist"):
+            match_item = next((item for item in st.session_state.scan_results if item["Kaunter"] == selected_to_wl), None)
+            if match_item and match_item not in st.session_state.watchlist:
+                st.session_state.watchlist.append(match_item)
+                st.success(f"✅ {selected_to_wl} berjaya dimasukkan ke Watchlist!")
+            else:
+                st.warning("Kaunter sudah ada dalam Watchlist.")
+
+        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
+        cols_tv = st.columns(6)
+        for i, t_name in enumerate(st.session_state.raw_tickers):
+            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
+            with cols_tv[i % 6]:
+                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
+
+        st.markdown("---")
+        csv_data = df_display.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
+    else:
+        st.info("👈 Pilih penapis di sidebar dan klik **Mula Imbas Pasaran Sekarang** di atas.")
