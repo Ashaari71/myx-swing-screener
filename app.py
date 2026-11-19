@@ -81,4 +81,4 @@ def fetch_tradingview_scanner(tickers):
                     "rvol": vals[11] if len(vals) > 11 and vals[11] is not None else 0.0,
                     "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
                     "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
-                    "macd_
+                    "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
