@@ -5,9 +5,21 @@ import pandas as pd
 import pytz
 import requests
 import streamlit as st
-from apscheduler.schedulers.background import BackgroundScheduler
-from openai import OpenAI
 from PIL import Image
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    APSCHEDULER_AVAILABLE = True
+except Exception:
+    BackgroundScheduler = None
+    APSCHEDULER_AVAILABLE = False
+
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except Exception:
+    OpenAI = None
+    OPENAI_AVAILABLE = False
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
@@ -20,7 +32,6 @@ st.markdown("""
 st.title("📈 MYX Swing Pro: Auto Scheduler, Screener, AI Vision & Watchlist")
 st.markdown("Sistem Imbasan Automatik Berjadual, Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), AI Chart Inspector & Multi-TP")
 
-# --- SENARAI PENGECUALIAN KAUNTER BUKAN PATUH SYARIAH ---
 NON_SHARIAH_EXCLUDED = {
     "MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK",
     "ABMB", "AFFIN", "MBSB", "BIMB", "HLFG", "LPI", "ALLIANZ",
@@ -28,7 +39,6 @@ NON_SHARIAH_EXCLUDED = {
     "CARLSBG", "HEIM", "BAT", "ASTRO", "CAPITALA",
 }
 
-# --- MASTER SEKTOR & KAUNTER UTAMA BURSA MALAYSIA ---
 sector_benchmarks = {
     "🔥 Pembinaan & Infrastruktur (Construction)": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
     "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
@@ -47,7 +57,6 @@ for sec_name, t_list in sector_benchmarks.items():
 master_bursa_tickers = list(set(master_bursa_tickers))
 
 
-# --- FUNGSI AMBIL LIVE DATA DARI TRADINGVIEW SCANNER API ---
 def fetch_tradingview_scanner(tickers):
     formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
     url = "https://scanner.tradingview.com/malaysia/scan"
@@ -94,11 +103,6 @@ def fetch_tradingview_scanner(tickers):
 
 
 def semak_uptrend_menaik(info, rsi_min=50.0, rsi_max=80.0):
-    """
-    Menyemak sama ada kaunter berada dalam fasa uptrend menaik:
-    - Harga semasa berada di atas EMA20 dan EMA20 berada di atas EMA50
-    - RSI berada dalam julat menaik yang ditetapkan
-    """
     harga = info.get("close", 0.0)
     ema20 = info.get("ema20", 0.0)
     ema50 = info.get("ema50", 0.0)
@@ -109,7 +113,6 @@ def semak_uptrend_menaik(info, rsi_min=50.0, rsi_max=80.0):
     return ema_valid and rsi_valid
 
 
-# --- FUNGSI IMBASAN LATAR BELAKANG (BACKGROUND SCHEDULER JOB) ---
 def background_scan_job():
     try:
         shariah_tickers = [t for t in master_bursa_tickers if t not in NON_SHARIAH_EXCLUDED]
@@ -153,6 +156,65 @@ def background_scan_job():
 
 @st.cache_resource
 def start_scheduler():
-    scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kuala_Lumpur"))
-    scheduler.add_job(background_scan_job, "cron", hour=9, minute=0, day_of_week="mon-fri")
-    scheduler.add_job(background_scan_job, "cron", hour=17, minute=0, day_of_week="mon-fri")
+    if not APSCHEDULER_AVAILABLE or BackgroundScheduler is None:
+        return None
+    try:
+        scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kuala_Lumpur"))
+        scheduler.add_job(background_scan_job, "cron", hour=9, minute=0, day_of_week="mon-fri")
+        scheduler.add_job(background_scan_job, "cron", hour=17, minute=0, day_of_week="mon-fri")
+        scheduler.start()
+        return scheduler
+    except Exception:
+        return None
+
+
+start_scheduler()
+
+st.sidebar.header("⚙️ Kriteria Tapisan Asas")
+min_price = st.sidebar.number_input("Harga Minimum (RM)", value=0.50, step=0.05)
+filter_shariah_only = st.sidebar.checkbox("Tapis Keluar Saham Bukan Syariah (Bank/Konvensional)", value=True)
+filter_uptrend_only = st.sidebar.checkbox("Hanya Uptrend Menaik (Harga > EMA20 > EMA50)", value=True)
+min_rsi = st.sidebar.slider("Had Minimum RSI (Uptrend)", 30, 65, 50, 1)
+max_rsi = st.sidebar.slider("Had Maksimum RSI", 70, 95, 80, 1)
+min_change_pct = st.sidebar.slider("Perubahan Harian Min (%)", -5.0, 5.0, -2.0, 0.5)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🎛️ Penapisan Indikator & Volum")
+min_rvol = st.sidebar.slider("RVOL Minimum (10D) [0 = Semua, 1.2 = Sihat, 1.5 = Kuat]", 0.0, 3.0, 0.0, 0.1)
+filter_vol_higher = st.sidebar.checkbox("Hanya Volum > Volum Sebelumnya", value=False)
+filter_macd = st.sidebar.checkbox("Hanya MACD Bullish Crossover (MACD > Signal)", value=False)
+filter_bb_squeeze = st.sidebar.checkbox("Hanya Bollinger Bands Squeeze (Konsolidasi Sempit)", value=False)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🤖 OpenAI API Tetapan")
+openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password", placeholder="sk-...")
+
+st.sidebar.markdown("---")
+st.sidebar.header("🔔 Telegram Bot Alert (Manual Test)")
+telegram_token = st.sidebar.text_input("Telegram Bot Token", type="password")
+telegram_chat_id = st.sidebar.text_input("Telegram Chat ID")
+
+st.sidebar.markdown("---")
+st.sidebar.header("🧮 Kalkulator Risiko & Multi-TP")
+calc_capital = st.sidebar.number_input("Jumlah Modal (RM):", value=10000.0, step=500.0)
+calc_risk_pct = st.sidebar.slider("Risiko Maksimum (% dari Modal):", 1.0, 5.0, 2.0, 0.5)
+calc_entry = st.sidebar.number_input("Harga Beli (Entry) (RM):", value=1.00, step=0.01)
+calc_sl = st.sidebar.number_input("Harga Stop-Loss (SL) (RM):", value=0.92, step=0.01)
+calc_tp1 = st.sidebar.number_input("Target 1 (TP1 - 50% Lot):", value=1.10, step=0.01)
+calc_tp2 = st.sidebar.number_input("Target 2 (TP2 - 50% Lot):", value=1.25, step=0.01)
+
+if calc_entry > 0 and calc_sl > 0 and calc_entry > calc_sl:
+    max_risk_rm = calc_capital * (calc_risk_pct / 100.0)
+    risk_per_share = calc_entry - calc_sl
+    raw_shares = max_risk_rm / risk_per_share
+    suggested_shares = max(100, int(raw_shares // 100) * 100)
+    total_investment = suggested_shares * calc_entry
+    actual_risk_rm = suggested_shares * risk_per_share
+
+    half_shares = suggested_shares // 2
+    profit_tp1 = half_shares * (calc_tp1 - calc_entry) if calc_tp1 > calc_entry else 0
+    profit_tp2 = half_shares * (calc_tp2 - calc_entry) if calc_tp2 > calc_entry else 0
+    rr_ratio = (calc_tp2 - calc_entry) / risk_per_share if risk_per_share > 0 else 0
+
+    st.sidebar.markdown(f"""
+    <div style="background-color: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363
