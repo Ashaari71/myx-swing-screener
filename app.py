@@ -82,3 +82,9 @@ def fetch_tradingview_scanner(tickers):
                     "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
                     "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
                     "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
+                    "bb_upper": vals[6] if len(vals) > 6 and vals[6] is not None else 0.0,
+                "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
+                "ema20": vals[8] if len(vals) > 8 and vals[8] is not None else 0.0,
+                "ema50": vals[9] if len(vals) > 9 and vals[9] is not None else 0.0,
+            }
+                    
