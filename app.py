@@ -327,8 +327,8 @@ else:
                 st.success(f"{pick} ditambah ke Watchlist.")
 
         csv_bytes = df_res.to_csv(index=False).encode("utf-8")
-                st.markdown("**Carta TradingView:**")
-        cols_tv = st.columns(6)
+        st.markdown("**Carta TradingView:**")                  
+        cols_tv = st.columns(6)        
         for idx, t_name in enumerate(st.session_state.raw_tickers):
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
             with cols_tv[idx % 6]:
