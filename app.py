@@ -49,7 +49,7 @@ def fetch_tradingview_scanner(tickers):
         "columns": [
             "close", "change", "volume", "RSI",
             "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
-            "EMA20", "EMA50"
+            "EMA20", "EMA50", "volume[1]"
         ]
     }
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -64,10 +64,12 @@ def fetch_tradingview_scanner(tickers):
                 close_val = vals[0] if len(vals) > 0 and vals[0] is not None else 0.0
                 ema20_val = vals[8] if len(vals) > 8 and vals[8] is not None else 0.0
                 ema50_val = vals[9] if len(vals) > 9 and vals[9] is not None else 0.0
+                prev_vol_val = vals[10] if len(vals) > 10 and vals[10] is not None else 0
                 results[sym] = {
                     "close": close_val,
                     "change": vals[1] if len(vals) > 1 and vals[1] is not None else 0.0,
                     "volume": vals[2] if len(vals) > 2 and vals[2] is not None else 0,
+                    "prev_volume": prev_vol_val,
                     "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
                     "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
                     "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
@@ -141,6 +143,7 @@ def background_scan_job():
 @st.cache_resource
 def start_scheduler():
     scheduler = BackgroundScheduler(timezone=pytz.timezone("Asia/Kuala_Lumpur"))
+    # Imbasan automatik setiap hari bekerja pada jam 9:00 pagi (Buka Pasaran) & 5:00 petang (Tutup Pasaran)
     scheduler.add_job(background_scan_job, 'cron', hour=9, minute=0, day_of_week='mon-fri')
     scheduler.add_job(background_scan_job, 'cron', hour=17, minute=0, day_of_week='mon-fri')
     scheduler.start()
@@ -365,6 +368,7 @@ else:
                 change = info["change"]
                 rsi_val = info["rsi"]
                 vol = info["volume"]
+                prev_vol = info.get("prev_volume", 0)
                 macd = info["macd"]
                 macd_sig = info["macd_signal"]
                 bb_up = info["bb_upper"]
@@ -395,82 +399,3 @@ else:
                 elif is_uptrend:
                     fokus_kajian = "📈 Uptrend Menaik (Kaji BOB/BOD ikut Carta)"
                 else:
-                    fokus_kajian = "⚖️ Bukan Uptrend Penuh (Perlu Semak Carta)"
-
-                sec_name = ticker_to_sector.get(t, "Lain-lain")
-                item_data = {
-                    "Kaunter": t,
-                    "Sektor": sec_name,
-                    "Harga (RM)": entry_price,
-                    "EMA20": round(ema20, 2) if ema20 > 0 else "-",
-                    "EMA50": round(ema50, 2) if ema50 > 0 else "-",
-                    "Perubahan": f"{'+' if change>=0 else ''}{change:.2f}%",
-                    "RSI": round(rsi_val, 1),
-                    "Status & Fokus": fokus_kajian,
-                    "Volum": f"{vol:,.0f}"
-                }
-                scan_results.append(item_data)
-                raw_tickers.append(t)
-
-                if is_uptrend:
-                    alert_messages.append(
-                        f"• *{t}* ({sec_name}) | RM {entry_price:.2f} | RSI {rsi_val:.1f} | {fokus_kajian}"
-                    )
-
-        st.session_state.scan_results = scan_results
-        st.session_state.raw_tickers = raw_tickers
-
-        if alert_messages and telegram_token and telegram_chat_id:
-            full_msg = "🚨 *MYX UPTREND SCREENER ALERT* 🚨\nKaunter lulus uptrend menaik:\n" + "\n".join(alert_messages)
-            send_telegram_message(telegram_token, telegram_chat_id, full_msg)
-
-        # Kemas kini Prestasi Sektor setiap kali imbasan dijalankan
-        sector_perf = []
-        for sec_name, t_list in sector_benchmarks.items():
-            sec_data = fetch_tradingview_scanner(t_list)
-            sec_changes = [v["change"] for v in sec_data.values() if "change" in v]
-            avg_ret = np.mean(sec_changes) if sec_changes else 0.0
-            status_trend = "🔥 Sektor Leader" if avg_ret > 0.5 else ("📈 Positif" if avg_ret >= 0 else "📉 Lemah")
-            sector_perf.append({
-                "Sektor Pasaran": sec_name,
-                "Prestasi (%)": f"{'+' if avg_ret>=0 else ''}{avg_ret:.2f}%",
-                "Status Trend": status_trend
-            })
-        st.session_state.sector_perf = sector_perf
-
-    # Prestasi Sektor
-    st.subheader("📊 Prestasi Sektor Semasa")
-    if st.session_state.sector_perf:
-        st.dataframe(pd.DataFrame(st.session_state.sector_perf), use_container_width=True, hide_index=True)
-    else:
-        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk memuatkan prestasi sektor terkini dan menapis kaunter uptrend menaik.")
-
-    st.markdown("---")
-
-    if st.session_state.scan_results:
-        st.success(f"Berjaya menemui **{len(st.session_state.scan_results)} kaunter** sepadan!")
-        df_display = pd.DataFrame(st.session_state.scan_results)
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-
-        st.markdown("### ⭐ Simpan ke Watchlist Peribadi:")
-        selected_to_wl = st.selectbox("Pilih kaunter untuk dimasukkan ke Watchlist:", st.session_state.raw_tickers)
-        if st.button("➕ Tambah ke Watchlist"):
-            match_item = next((item for item in st.session_state.scan_results if item["Kaunter"] == selected_to_wl), None)
-            if match_item and match_item not in st.session_state.watchlist:
-                st.session_state.watchlist.append(match_item)
-                st.success(f"✅ {selected_to_wl} berjaya dimasukkan ke Watchlist!")
-            else:
-                st.warning("Kaunter sudah ada dalam Watchlist.")
-
-        st.markdown("🔗 **Pautan Cepat Carta TradingView:**")
-        cols_tv = st.columns(6)
-        for i, t_name in enumerate(st.session_state.raw_tickers):
-            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[i % 6]:
-                st.markdown(f"👉 [{t_name}]({tv_url})", unsafe_allow_html=True)
-
-        st.markdown("---")
-        csv_data = df_display.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Muat Turun Laporan (CSV)", data=csv_data, file_name="myx_screener_report.csv", mime="text/csv")
-    else:
-        st.info("👈 Pilih penapis di sidebar (seperti **Hanya Uptrend Menaik**, **Had Minimum RSI**, atau **MACD/BB Squeeze**) dan klik **Mula Imbas Pasaran Sekarang** di atas.")
