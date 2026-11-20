@@ -243,10 +243,10 @@ def bersihkan_html_untuk_telegram(teks: str) -> str:
     if not teks:
         return ""
     teks_format = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", teks)
-    teks_format = re.sub(r"<(?!(?:/?(?:b|i|u|s|code|pre|a)\b))", "&lt;", teks_format)
-    teks_format = teks_format.replace(">", "&gt;")
+    teks_format = re.sub(r"<(?!(?:/?(?:b|i|u|s|code|pre|a)\b))", "<", teks_format)
+    teks_format = teks_format.replace(">", ">")
     teks_format = re.sub(
-        r"&lt;(/?(?:b|i|u|s|code|pre|a))(&gt;)",
+        r"<(/?(?:b|i|u|s|code|pre|a))(>)",
         r"<\1>",
         teks_format,
         flags=re.IGNORECASE,
@@ -461,11 +461,22 @@ elif app_mode == "📸 AI Chart Vision":
             return
         st.session_state["ai_ticker_val"] = terpilih
         data_t = st.session_state.get("raw_scan_map", {}).get(terpilih, {})
-        if data_t.get("close", 0.0) > 0:
-            st.session_state["ai_price_val"] = float(data_t["close"])
-        st.session_state["ai_rvol_val"] = float(data_t.get("rvol", 0.0))
-        st.session_state["ai_ema20_val"] = float(data_t.get("ema20", 0.0))
-        st.session_state["ai_ema50_val"] = float(data_t.get("ema50", 0.0))
+
+        harga_baru = float(data_t.get("close") or 0.0)
+        if harga_baru > 0:
+            st.session_state["ai_price_val"] = harga_baru
+
+        rvol_baru = float(data_t.get("rvol") or 0.0)
+        if rvol_baru > 0:
+            st.session_state["ai_rvol_val"] = rvol_baru
+
+        ema20_baru = float(data_t.get("ema20") or 0.0)
+        if ema20_baru > 0:
+            st.session_state["ai_ema20_val"] = ema20_baru
+
+        ema50_baru = float(data_t.get("ema50") or 0.0)
+        if ema50_baru > 0:
+            st.session_state["ai_ema50_val"] = ema50_baru
 
     st.session_state.setdefault("ai_ticker_val", "PEKAT")
     st.session_state.setdefault("ai_price_val", 0.95)
@@ -572,7 +583,14 @@ elif app_mode == "📸 AI Chart Vision":
 
     if st.session_state.ai_chart_history:
         st.divider()
-        st.markdown("**Sejarah Analisis Carta Sesi Ini**")
+        col_tajuk, col_butang = st.columns([4, 1])
+        with col_tajuk:
+            st.markdown("**Sejarah Analisis Carta Sesi Ini**")
+        with col_butang:
+            if st.button("🗑️ Kosongkan Sejarah", key="kosongkan_sejarah_ai"):
+                st.session_state.ai_chart_history = []
+                st.rerun()
+
         for item in st.session_state.ai_chart_history:
             label_row = f"{item['Kaunter']} ({item['TF']}) — `{item['Status']}` | TG: {item['Telegram']}"
             with st.expander(label_row, expanded=False):
@@ -771,5 +789,6 @@ else:
         st.download_button("📥 Muat Turun CSV", data=csv_bytes, file_name="myx_screener.csv", mime="text/csv")
     else:
         st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
+```[cite: 2]
 
-
+*Peringatan:* Pastikan anda menyalin dari baris `import base64` hingga ke baris `st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")` sahaja sebelum *commit* ke GitHub supaya tiada teks tambahan di bawah[cite: 2, 10, 11].
