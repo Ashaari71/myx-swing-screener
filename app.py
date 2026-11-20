@@ -789,6 +789,6 @@ else:
         st.download_button("📥 Muat Turun CSV", data=csv_bytes, file_name="myx_screener.csv", mime="text/csv")
     else:
         st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
-```[cite: 2]
+
 
 *Peringatan:* Pastikan anda menyalin dari baris `import base64` hingga ke baris `st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")` sahaja sebelum *commit* ke GitHub supaya tiada teks tambahan di bawah[cite: 2, 10, 11].
