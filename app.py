@@ -1,12 +1,52 @@
 import base64
+import io
+import os
 import re
 import time
-from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import requests
 import streamlit as st
-from openai import OpenAI
+from PIL import Image
 
-st.set_page_config(page_title="Screener & AI Chart Filter", layout="wide")
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except Exception:
+    OpenAI = None
+    OPENAI_AVAILABLE = False
+
+st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
+
+st.title("📈 MYX Swing Pro: Screener, Heatmap, AI Vision & Watchlist")
+st.caption("Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL/52WH), Imbasan Penuh Mengikut Sektor & Heatmap")
+
+NON_SHARIAH_EXCLUDED = {
+    "MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK",
+    "ABMB", "AFFIN", "MBSB", "BIMB", "HLFG", "LPI", "ALLIANZ",
+    "TAKAFUL", "BURSA", "GENTING", "GENM", "MAGNUM", "SPTOTO",
+    "CARLSBG", "HEIM", "BAT", "ASTRO", "CAPITALA",
+}
+
+sector_benchmarks = {
+    "🔥 Pembinaan & Infrastruktur": ["GAMUDA", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
+    "⚡ Tenaga Boleh Baharu & Utiliti": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
+    "💻 Teknologi & Semikonduktor": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX", "DNEX"],
+    "🏥 Penjagaan Kesihatan": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
+    "🌾 Perladangan & Komoditi": ["KLK", "IOICORP", "FGV", "SIMEPROP"],
+    "⚙️ Perindustrian & Telco": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"],
+}
+
+SECTOR_TV_MAP = {
+    "🔥 Pembinaan & Infrastruktur": ["Construction", "Engineering & Construction", "Industrials"],
+    "⚡ Tenaga Boleh Baharu & Utiliti": ["Utilities", "Energy Minerals"],
+    "💻 Teknologi & Semikonduktor": ["Technology Services", "Electronic Technology"],
+    "🏥 Penjagaan Kesihatan": ["Health Services", "Health Technology"],
+    "🌾 Perladangan & Komoditi": ["Agricultural Commodities", "Producer Manufacturing"],
+    "⚙️ Perindustrian & Telco": ["Industrial Services", "Communications", "Distribution Services"],
+}
 
 PROMPT_PENAPIS_PENUH = """
 Bertindak sebagai penapis setup teknikal yang ketat untuk strategi Buy on Breakout (BOB) dan Buy on Dip (BOD).
@@ -55,88 +95,126 @@ Format output (ringkas & terus ke inti pati):
    - **Paras Batal:** [Paras harga jika struktur gagal]
 """
 
+master_bursa_tickers = []
+ticker_to_sector = {}
+for sec_name, t_list in sector_benchmarks.items():
+    for t in t_list:
+        ticker_to_sector[t] = sec_name
+    master_bursa_tickers.extend(t_list)
+master_bursa_tickers = list(dict.fromkeys(master_bursa_tickers))
 
-def dapatkan_openai_client() -> OpenAI | None:
-    api_key = ""
+
+def dapatkan_openai_key(ui_key: str) -> str:
+    if ui_key and ui_key.strip():
+        return ui_key.strip()
     if "OPENAI_API_KEY" in st.secrets:
-        api_key = st.secrets["OPENAI_API_KEY"]
-    if not api_key:
-        import os
-        api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
-        return None
-    return OpenAI(api_key=api_key)
+        return str(st.secrets["OPENAI_API_KEY"]).strip()
+    return os.getenv("OPENAI_API_KEY", "").strip()
 
 
-def encode_image_bytes_base64(image_bytes: bytes) -> str:
-    return base64.b64encode(image_bytes).decode("utf-8")
+def fetch_tradingview_scanner(tickers):
+    formatted_symbols = [f"MYX:{t.strip().replace('.KL', '')}" for t in tickers]
+    url = "https://scanner.tradingview.com/malaysia/scan"
+    payload = {
+        "symbols": {"tickers": formatted_symbols},
+        "columns": [
+            "close", "change", "volume", "RSI",
+            "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
+            "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc",
+            "price_52_week_high",
+        ],
+    }
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=8)
+        if response.status_code == 200:
+            data = response.json()
+            results = {}
+            for item in data.get("data", []):
+                sym = item["s"].replace("MYX:", "")
+                vals = item["d"]
+                results[sym] = {
+                    "close": vals[0] if len(vals) > 0 and vals[0] is not None else 0.0,
+                    "change": vals[1] if len(vals) > 1 and vals[1] is not None else 0.0,
+                    "volume": vals[2] if len(vals) > 2 and vals[2] is not None else 0,
+                    "prev_volume": vals[10] if len(vals) > 10 and vals[10] is not None else 0,
+                    "rvol": vals[11] if len(vals) > 11 and vals[11] is not None else 0.0,
+                    "rsi": vals[3] if len(vals) > 3 and vals[3] is not None else 50.0,
+                    "macd": vals[4] if len(vals) > 4 and vals[4] is not None else 0.0,
+                    "macd_signal": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
+                    "bb_upper": vals[6] if len(vals) > 6 and vals[6] is not None else 0.0,
+                    "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
+                    "ema20": vals[8] if len(vals) > 8 and vals[8] is not None else 0.0,
+                    "ema50": vals[9] if len(vals) > 9 and vals[9] is not None else 0.0,
+                    "high_52w": vals[12] if len(vals) > 12 and vals[12] is not None else 0.0,
+                }
+            return results
+    except Exception:
+        pass
+    return {}
 
 
-def analisis_carta_bytes(
-    image_bytes: bytes,
-    mime_type: str = "image/png",
-    ticker: str = "",
-    timeframe: str = "Daily",
-    rvol: float | None = None,
-    ema20: float | None = None,
-    ema50: float | None = None,
-    model: str = "gpt-4o",
-    max_retries: int = 2,
-) -> str:
-    client = dapatkan_openai_client()
-    if client is None:
-        return "1. **Status Setup:** TIADA SETUP - TUNGGU\nOPENAI_API_KEY belum dijumpai."
+def fetch_sector_all_stocks(sector_label, limit=120):
+    tv_sectors = SECTOR_TV_MAP.get(sector_label, [])
+    url = "https://scanner.tradingview.com/malaysia/scan"
+    payload = {
+        "markets": ["malaysia"],
+        "symbols": {"query": {"types": ["stock"]}},
+        "options": {"lang": "en"},
+        "columns": [
+            "name", "close", "change", "volume", "RSI",
+            "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
+            "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc",
+            "price_52_week_high", "sector",
+        ],
+        "filter": [{"left": "sector", "operation": "in_range", "right": tv_sectors}] if tv_sectors else [],
+        "sort": {"sortBy": "volume", "sortOrder": "desc"},
+        "range": [0, limit],
+    }
+    headers = {"User-Agent": "Mozilla/5.0"}
+    results = {}
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 200:
+            for item in response.json().get("data", []):
+                vals = item.get("d", [])
+                sym = str(vals[0]).upper() if len(vals) > 0 and vals[0] else item["s"].replace("MYX:", "")
+                results[sym] = {
+                    "close": vals[1] if len(vals) > 1 and vals[1] is not None else 0.0,
+                    "change": vals[2] if len(vals) > 2 and vals[2] is not None else 0.0,
+                    "volume": vals[3] if len(vals) > 3 and vals[3] is not None else 0,
+                    "rsi": vals[4] if len(vals) > 4 and vals[4] is not None else 50.0,
+                    "macd": vals[5] if len(vals) > 5 and vals[5] is not None else 0.0,
+                    "macd_signal": vals[6] if len(vals) > 6 and vals[6] is not None else 0.0,
+                    "bb_upper": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
+                    "bb_lower": vals[8] if len(vals) > 8 and vals[8] is not None else 0.0,
+                    "ema20": vals[9] if len(vals) > 9 and vals[9] is not None else 0.0,
+                    "ema50": vals[10] if len(vals) > 10 and vals[10] is not None else 0.0,
+                    "prev_volume": vals[11] if len(vals) > 11 and vals[11] is not None else 0,
+                    "rvol": vals[12] if len(vals) > 12 and vals[12] is not None else 0.0,
+                    "high_52w": vals[13] if len(vals) > 13 and vals[13] is not None else 0.0,
+                }
+    except Exception:
+        pass
 
-    b64_img = encode_image_bytes_base64(image_bytes)
+    fallback_tickers = sector_benchmarks.get(sector_label, [])
+    if fallback_tickers:
+        fb_data = fetch_tradingview_scanner(fallback_tickers)
+        for k, v in fb_data.items():
+            if k not in results:
+                results[k] = v
 
-    konteks = [f"Timeframe: {timeframe}"]
-    if ticker:
-        konteks.append(f"Kaunter: {ticker.upper()}")
-    if rvol is not None:
-        konteks.append(f"RVOL: {rvol:.2f}x")
-    if ema20 is not None:
-        konteks.append(f"EMA 20: {ema20:.3f}")
-    if ema50 is not None:
-        konteks.append(f"EMA 50: {ema50:.3f}")
+    return results
 
-    user_text = f"Data Rujukan: {' | '.join(konteks)}\n\n{PROMPT_PENAPIS_PENUH}"
 
-    for percubaan in range(max_retries + 1):
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                temperature=0.1,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Anda ialah penganalisis teknikal yang berdisiplin, objektif, "
-                            "dan ketat menapis setup dagangan tanpa rekaan."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": user_text},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime_type};base64,{b64_img}",
-                                    "detail": "high",
-                                },
-                            },
-                        ],
-                    },
-                ],
-            )
-            return resp.choices[0].message.content or ""
-        except Exception as exc:
-            if percubaan < max_retries:
-                time.sleep(1.5 * (percubaan + 1))
-                continue
-            return f"1. **Status Setup:** TIADA SETUP - TUNGGU\nRalat API OpenAI: {exc}"
-
-    return "1. **Status Setup:** TIADA SETUP - TUNGGU"
+def semak_uptrend_menaik(info, rsi_min=50.0, rsi_max=80.0):
+    harga = info.get("close", 0.0)
+    ema20 = info.get("ema20", 0.0)
+    ema50 = info.get("ema50", 0.0)
+    rsi_val = info.get("rsi", 0.0)
+    ema_valid = (ema20 > 0) and (ema50 > 0) and (harga > ema20) and (ema20 > ema50)
+    rsi_valid = (rsi_val >= rsi_min) and (rsi_val <= rsi_max)
+    return ema_valid and rsi_valid
 
 
 def ekstrak_status_setup(teks_analisis: str) -> str:
@@ -161,79 +239,99 @@ def ekstrak_status_setup(teks_analisis: str) -> str:
     return "TIADA SETUP - TUNGGU"
 
 
-def url_tradingview_bursa(ticker: str) -> str:
-    bersih = ticker.strip().upper().replace(".KL", "")
-    return f"https://www.tradingview.com/chart/?symbol=MYX%3A{bersih}"
+def bersihkan_html_untuk_telegram(teks: str) -> str:
+    if not teks:
+        return ""
+    teks_format = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", teks)
+    teks_format = re.sub(r"<(?!(?:/?(?:b|i|u|s|code|pre|a)\b))", "<", teks_format)
+    teks_format = teks_format.replace(">", ">")
+    teks_format = re.sub(
+        r"<(/?(?:b|i|u|s|code|pre|a))(>)",
+        r"<\1>",
+        teks_format,
+        flags=re.IGNORECASE,
+    )
+    return teks_format
 
 
-# --- Antara Muka Uji Pantas ---
-st.title("Analisis Carta AI — Penapis BOB & BOD")
+def send_telegram_message(token, chat_id, message, parse_mode="HTML"):
+    if not token or not chat_id:
+        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    teks_bersih = bersihkan_html_untuk_telegram(message) if parse_mode == "HTML" else message
+    if len(teks_bersih) > 4000:
+        teks_bersih = teks_bersih[:3990] + "\n..."
+    try:
+        res = requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": teks_bersih,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            },
+            timeout=10,
+        )
+        if res.ok and res.json().get("ok"):
+            return True
+        fallback = requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": re.sub(r"<[^>]+>", "", teks_bersih),
+                "disable_web_page_preview": True,
+            },
+            timeout=10,
+        )
+        return bool(fallback.ok and fallback.json().get("ok"))
+    except Exception:
+        return False
 
-if "senarai_hasil" not in st.session_state:
-    st.session_state["senarai_hasil"] = []
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    ticker_input = st.text_input("Kaunter (Bursa)", value="PEKAT")
-    timeframe_input = st.selectbox("Timeframe", ["Daily", "15m", "1H"])
-with col2:
-    rvol_input = st.number_input("RVOL", min_value=0.0, value=1.50, step=0.10)
-    ema20_input = st.number_input("EMA 20", min_value=0.0, value=0.000, step=0.005, format="%.3f")
-with col3:
-    ema50_input = st.number_input("EMA 50", min_value=0.0, value=0.000, step=0.005, format="%.3f")
-    uploaded_img = st.file_uploader("Muat Naik Gambar Carta", type=["png", "jpg", "jpeg"])
+def analyze_chart_bob_bod(
+    api_key,
+    image,
+    trend,
+    price,
+    ticker="",
+    timeframe="Daily",
+    rvol=None,
+    ema20=None,
+    ema50=None,
+    model="gpt-4o",
+    max_retries=2,
+):
+    if not OPENAI_AVAILABLE or OpenAI is None:
+        return "1. **Status Setup:** TIADA SETUP - TUNGGU\n⚠️ Pakej `openai` tidak dipasang."
+    if not api_key:
+        return "1. **Status Setup:** TIADA SETUP - TUNGGU\n⚠️ OpenAI API Key tidak dijumpai."
 
-if st.button("Analisis Carta", type="primary"):
-    if uploaded_img is None:
-        st.warning("Sila muat naik gambar carta terlebih dahulu.")
-    else:
-        with st.spinner("Sedang menganalisis carta..."):
-            teks_out = analisis_carta_bytes(
-                image_bytes=uploaded_img.getvalue(),
-                mime_type=uploaded_img.type or "image/png",
-                ticker=ticker_input,
-                timeframe=timeframe_input,
-                rvol=rvol_input if rvol_input > 0 else None,
-                ema20=ema20_input if ema20_input > 0 else None,
-                ema50=ema50_input if ema50_input > 0 else None,
-            )
-            status_out = ekstrak_status_setup(teks_out)
-            st.session_state["senarai_hasil"].insert(
-                0,
-                {
-                    "ticker": ticker_input.strip().upper(),
-                    "status": status_out,
-                    "timeframe": timeframe_input,
-                    "rvol": rvol_input if rvol_input > 0 else None,
-                    "analisis": teks_out,
-                    "tv_url": url_tradingview_bursa(ticker_input),
-                },
-            )
+    try:
+        client = OpenAI(api_key=api_key)
+        img_copy = image.copy()
+        if img_copy.mode in ("RGBA", "P"):
+            img_copy = img_copy.convert("RGB")
+        buf = io.BytesIO()
+        img_copy.save(buf, format="JPEG", quality=92)
+        b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-st.divider()
-st.subheader("Setup Sah (BOB Valid / BOD Valid)")
+        konteks = [
+            f"Timeframe: {timeframe}",
+            f"Trend Asas: {trend}",
+            f"Harga Semasa: RM {price:.3f}",
+        ]
+        if ticker:
+            konteks.append(f"Kaunter: {ticker.upper()}")
+        if rvol is not None and rvol > 0:
+            konteks.append(f"RVOL: {rvol:.2f}x")
+        if ema20 is not None and ema20 > 0:
+            konteks.append(f"EMA 20: {ema20:.3f}")
+        if ema50 is not None and ema50 > 0:
+            konteks.append(f"EMA 50: {ema50:.3f}")
 
-hasil_valid = [
-    x for x in st.session_state["senarai_hasil"]
-    if x["status"] in ("BOB Valid", "BOD Valid")
-]
+        user_prompt = f"Data Rujukan: {' | '.join(konteks)}\n\n{PROMPT_PENAPIS_PENUH}"
 
-if not hasil_valid:
-    st.info("Belum ada setup BOB Valid atau BOD Valid.")
-else:
-    for item in hasil_valid:
-        rvol_txt = f" | RVOL: {item['rvol']:.2f}x" if item["rvol"] is not None else ""
-        tajuk = f"**{item['ticker']}** — `{item['status']}` ({item['timeframe']}){rvol_txt}"
-        with st.expander(tajuk, expanded=True):
-            st.markdown(item["analisis"])
-            st.markdown(f"[Buka Carta di TradingView]({item['tv_url']})")
-
-hasil_ditolak = [
-    x for x in st.session_state["senarai_hasil"]
-    if x["status"] == "TIADA SETUP - TUNGGU"
-]
-if hasil_ditolak:
-    with st.expander(f"Kaunter Ditolak / Tunggu ({len(hasil_ditolak)})", expanded=False):
-        for item in hasil_ditolak:
-            st.markdown(f"**{item['ticker']}** ({item['timeframe']}) — `TIADA SETUP - TUNGGU`")
-            st.caption(item["analisis"])
+        for percubaan in range(max_retries + 1):
+            try:
+                resp = client.chat.completions.create(
+                    model
