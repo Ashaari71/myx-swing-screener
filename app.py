@@ -358,4 +358,4 @@ else:
         pick = st.selectbox("Pilih kaunter ke Watchlist:", st.session_state.raw_tickers)
         if st.button("➕ Tambah ke Watchlist"):
             item = next((x for x in st.session_state.scan_results if x["Kaunter"] == pick), None)
-            if
+           
