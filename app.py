@@ -36,7 +36,7 @@ sector_benchmarks = {
 }
 
 SECTOR_TV_MAP = {
-    "🔥 Pembinaan & Infrastruktur": ["Construction"],
+    "🔥 Pembinaan & Infrastruktur": ["Construction", "Engineering & Construction", "Industrials"],
     "⚡ Tenaga Boleh Baharu & Utiliti": ["Utilities", "Energy Minerals"],
     "💻 Teknologi & Semikonduktor": ["Technology Services", "Electronic Technology"],
     "🏥 Penjagaan Kesihatan": ["Health Services", "Health Technology"],
@@ -137,6 +137,15 @@ def fetch_sector_all_stocks(sector_label, limit=120):
                 }
     except Exception:
         pass
+
+    # Jika sektor pembinaan atau hasil sektor kosong, sertakan kaunter rujukan sektor tersebut sebagai sandaran
+    fallback_tickers = sector_benchmarks.get(sector_label, [])
+    if fallback_tickers:
+        fb_data = fetch_tradingview_scanner(fallback_tickers)
+        for k, v in fb_data.items():
+            if k not in results:
+                results[k] = v
+
     return results
 
 
@@ -377,7 +386,7 @@ else:
                 "Kaunter": t,
                 "Sektor": sec_name,
                 "Harga (RM)": round(price, 2),
-                "52WH (RM)": round(high_52w, 2) if high_52w > 0 else 0.0,
+                "52WH (RM)": round(high_52w, 2) if high_52w > 0 else "-",
                 "Jarak 52WH": jarak_52wh_str,
                 "Perubahan": f"{'+' if change >= 0 else ''}{change:.2f}%",
                 "RSI": round(rsi_val, 1),
@@ -397,65 +406,3 @@ else:
 
         sec_rows = []
         for s_name, t_list in sector_benchmarks.items():
-            if filter_shariah_only:
-                t_list = [x for x in t_list if x not in NON_SHARIAH_EXCLUDED]
-            s_data = fetch_tradingview_scanner(t_list)
-            vals = [v["change"] for v in s_data.values()]
-            avg = float(np.mean(vals)) if vals else 0.0
-            sec_rows.append({
-                "Sektor": s_name,
-                "Purata (%)": f"{'+' if avg >= 0 else ''}{avg:.2f}%",
-                "Status": "🔥 Leader" if avg > 0.5 else ("📈 Positif" if avg >= 0 else "📉 Lemah"),
-            })
-        st.session_state.sector_perf = sec_rows
-
-    st.subheader("🗺️ Heatmap Sektor & Kaunter")
-    if st.session_state.heatmap_rows:
-        df_hm = pd.DataFrame(st.session_state.heatmap_rows)
-        fig_hm = px.treemap(
-            df_hm,
-            path=["Sektor", "Kaunter"],
-            values="Volum",
-            color="Perubahan_Num",
-            color_continuous_scale=["#b91c1c", "#4b5563", "#15803d"],
-            color_continuous_midpoint=0,
-            range_color=[-5, 5],
-            labels={"Perubahan_Num": "Perubahan (%)"},
-            hover_data={"Harga (RM)": ":.2f", "Perubahan": True, "RSI": ":.1f", "Volum": ":,"},
-        )
-        fig_hm.update_traces(
-            texttemplate="<b>%{label}</b><br>RM %{customdata[0]:.2f}<br>%{customdata[1]}",
-            textposition="middle center",
-        )
-        fig_hm.update_layout(height=540, margin=dict(t=20, l=10, r=10, b=10))
-        st.plotly_chart(fig_hm, use_container_width=True)
-    else:
-        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk menjana heatmap sektor.")
-
-    st.subheader("📊 Prestasi Sektor")
-    if st.session_state.sector_perf:
-        st.dataframe(pd.DataFrame(st.session_state.sector_perf), use_container_width=True, hide_index=True)
-
-    st.subheader("📋 Hasil Imbasan")
-    if st.session_state.scan_results:
-        df_res = pd.DataFrame(st.session_state.scan_results)
-        st.dataframe(df_res, use_container_width=True, hide_index=True)
-
-        pick = st.selectbox("Pilih kaunter ke Watchlist:", st.session_state.raw_tickers)
-        if st.button("➕ Tambah ke Watchlist"):
-            item = next((x for x in st.session_state.scan_results if x["Kaunter"] == pick), None)
-            if item and item not in st.session_state.watchlist:
-                st.session_state.watchlist.append(item)
-                st.success(f"{pick} ditambah ke Watchlist.")
-
-        st.markdown("**Carta TradingView:**")
-        cols_tv = st.columns(6)
-        for idx, t_name in enumerate(st.session_state.raw_tickers):
-            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[idx % 6]:
-                st.markdown(f"👉 [{t_name}]({tv_url})")
-
-        csv_bytes = df_res.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Muat Turun CSV", data=csv_bytes, file_name="myx_screener.csv", mime="text/csv")
-    else:
-        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
