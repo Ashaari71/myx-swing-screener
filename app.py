@@ -771,7 +771,7 @@ else:
         st.download_button("📥 Muat Turun CSV", data=csv_bytes, file_name="myx_screener.csv", mime="text/csv")
     else:
         st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
-```[cite: 2]
+
 
 <ElicitationsGroup message="Selepas kod penuh ini di-commit ke app.py:">
   <Elicitation label="Cegah Telegram berulang" query="Tambahkan kod untuk mencegah notifikasi Telegram yang sama dihantar berulang kali pada hari yang sama."/>
