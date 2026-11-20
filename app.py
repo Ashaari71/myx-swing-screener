@@ -1,6 +1,8 @@
+import base64
 import io
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import requests
 import streamlit as st
 from PIL import Image
@@ -14,8 +16,8 @@ except Exception:
 
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
-st.title("📈 MYX Swing Pro: Screener, AI Vision & Watchlist")
-st.caption("Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), Prestasi Sektor, AI Chart Inspector & Multi-TP")
+st.title("📈 MYX Swing Pro: Screener, Heatmap, AI Vision & Watchlist")
+st.caption("Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), Heatmap Sektor, AI Chart Inspector & Multi-TP")
 
 NON_SHARIAH_EXCLUDED = {
     "MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK",
@@ -25,9 +27,9 @@ NON_SHARIAH_EXCLUDED = {
 }
 
 sector_benchmarks = {
-    "🔥 Pembinaan & Infrastruktur": ["GAMUD", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
+    "🔥 Pembinaan & Infrastruktur": ["GAMUDA", "SUNCON", "IJM", "MRCB", "WCT", "KERJAYA"],
     "⚡ Tenaga Boleh Baharu & Utiliti": ["CITAGLB", "SAMAIDEN", "PEKAT", "TENAGA", "YTLPOWR", "SOLARVEST"],
-    "💻 Teknologi & Semikonduktor": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX"],
+    "💻 Teknologi & Semikonduktor": ["FRONTKN", "INARI", "KGB", "MYEG", "UNISEM", "GTRONIC", "VITROX", "DNEX"],
     "🏥 Penjagaan Kesihatan": ["KPJ", "IHH", "TOPGLOV", "HARTA"],
     "🌾 Perladangan & Komoditi": ["KLK", "IOICORP", "FGV", "SIMEPROP"],
     "⚙️ Perindustrian & Telco": ["CDB", "MAXIS", "SIME", "PMETAL", "ANCOMNY", "WASCO"],
@@ -39,7 +41,7 @@ for sec_name, t_list in sector_benchmarks.items():
     for t in t_list:
         ticker_to_sector[t] = sec_name
     master_bursa_tickers.extend(t_list)
-master_bursa_tickers = list(set(master_bursa_tickers))
+master_bursa_tickers = list(dict.fromkeys(master_bursa_tickers))
 
 
 def fetch_tradingview_scanner(tickers):
@@ -154,7 +156,6 @@ def analyze_chart_bob_bod(api_key, image, trend, price):
     if not OPENAI_AVAILABLE or OpenAI is None:
         return "⚠️ Pakej `openai` tidak dipasang."
     try:
-        import base64
         client = OpenAI(api_key=api_key)
         if image.mode in ("RGBA", "P"):
             image = image.convert("RGB")
@@ -182,7 +183,7 @@ def analyze_chart_bob_bod(api_key, image, trend, price):
         return f"⚠️ Ralat OpenAI: {e}"
 
 
-for k in ["scan_results", "raw_tickers", "watchlist", "sector_perf"]:
+for k in ["scan_results", "raw_tickers", "watchlist", "sector_perf", "heatmap_rows"]:
     if k not in st.session_state:
         st.session_state[k] = []
 
@@ -237,6 +238,7 @@ else:
         tv_data = fetch_tradingview_scanner(targets)
         rows = []
         alerts = []
+        heatmap_rows = []
 
         for t in targets:
             info = tv_data.get(t)
@@ -248,6 +250,17 @@ else:
             vol = info["volume"]
             prev_vol = info["prev_volume"]
             rvol = info["rvol"]
+            sec_name = ticker_to_sector.get(t, "Lain-lain")
+
+            heatmap_rows.append({
+                "Kaunter": t,
+                "Sektor": sec_name,
+                "Harga (RM)": price,
+                "Perubahan": f"{'+' if change >= 0 else ''}{change:.2f}%",
+                "Perubahan_Num": change,
+                "RSI": rsi_val,
+                "Volum": max(float(vol), 1.0),
+            })
 
             if price < min_price or rsi_val > max_rsi or change < min_change_pct:
                 continue
@@ -276,7 +289,6 @@ else:
             else:
                 fokus = "⚖️ Semak Carta"
 
-            sec_name = ticker_to_sector.get(t, "Lain-lain")
             rows.append({
                 "Kaunter": t,
                 "Sektor": sec_name,
@@ -292,6 +304,7 @@ else:
 
         st.session_state.scan_results = rows
         st.session_state.raw_tickers = [r["Kaunter"] for r in rows]
+        st.session_state.heatmap_rows = heatmap_rows
 
         if alerts and telegram_token and telegram_chat_id:
             send_telegram_message(telegram_token, telegram_chat_id, "🚨 *MYX SCREENER ALERT*\n" + "\n".join(alerts))
@@ -310,6 +323,27 @@ else:
             })
         st.session_state.sector_perf = sec_rows
 
+    st.subheader("🗺️ Heatmap Sektor & Kaunter")
+    if st.session_state.heatmap_rows:
+        df_hm = pd.DataFrame(st.session_state.heatmap_rows)
+        fig_hm = px.treemap(
+            df_hm,
+            path=["Sektor", "Kaunter"],
+            values="Volum",
+            color="Perubahan_Num",
+            color_continuous_scale=["#b91c1c", "#4b5563", "#15803d"],
+            color_continuous_midpoint=0,
+            hover_data={"Harga (RM)": ":.2f", "Perubahan": True, "RSI": ":.1f", "Volum": ":,"},
+        )
+        fig_hm.update_traces(
+            texttemplate="<b>%{label}</b><br>RM %{customdata[0]:.2f}<br>%{customdata[1]}",
+            textposition="middle center",
+        )
+        fig_hm.update_layout(height=540, margin=dict(t=20, l=10, r=10, b=10))
+        st.plotly_chart(fig_hm, use_container_width=True)
+    else:
+        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk menjana heatmap sektor.")
+
     st.subheader("📊 Prestasi Sektor")
     if st.session_state.sector_perf:
         st.dataframe(pd.DataFrame(st.session_state.sector_perf), use_container_width=True, hide_index=True)
@@ -326,13 +360,14 @@ else:
                 st.session_state.watchlist.append(item)
                 st.success(f"{pick} ditambah ke Watchlist.")
 
-        csv_bytes = df_res.to_csv(index=False).encode("utf-8")
-        st.markdown("**Carta TradingView:**")                  
-        cols_tv = st.columns(6)        
+        st.markdown("**Carta TradingView:**")
+        cols_tv = st.columns(6)
         for idx, t_name in enumerate(st.session_state.raw_tickers):
             tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
             with cols_tv[idx % 6]:
                 st.markdown(f"👉 [{t_name}]({tv_url})")
+
+        csv_bytes = df_res.to_csv(index=False).encode("utf-8")
         st.download_button("📥 Muat Turun CSV", data=csv_bytes, file_name="myx_screener.csv", mime="text/csv")
     else:
         st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
