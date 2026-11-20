@@ -73,7 +73,7 @@ def fetch_tradingview_scanner(tickers):
             for item in data.get("data", []):
                 sym = item["s"].replace("MYX:", "")
                 vals = item["d"]
-                results[sym] = {
+                results[sym] = {}
                     "close": vals[0] if len(vals) > 0 and vals[0] is not None else 0.0,
                     "change": vals[1] if len(vals) > 1 and vals[1] is not None else 0.0,
                     "volume": vals[2] if len(vals) > 2 and vals[2] is not None else 0,
