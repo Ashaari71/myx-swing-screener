@@ -333,6 +333,8 @@ else:
             color="Perubahan_Num",
             color_continuous_scale=["#b91c1c", "#4b5563", "#15803d"],
             color_continuous_midpoint=0,
+            range_color=[-5, 5],
+            labels={"Perubahan_Num": "Perubahan (%)"},
             hover_data={"Harga (RM)": ":.2f", "Perubahan": True, "RSI": ":.1f", "Volum": ":,"},
         )
         fig_hm.update_traces(
@@ -356,18 +358,4 @@ else:
         pick = st.selectbox("Pilih kaunter ke Watchlist:", st.session_state.raw_tickers)
         if st.button("➕ Tambah ke Watchlist"):
             item = next((x for x in st.session_state.scan_results if x["Kaunter"] == pick), None)
-            if item and item not in st.session_state.watchlist:
-                st.session_state.watchlist.append(item)
-                st.success(f"{pick} ditambah ke Watchlist.")
-
-        st.markdown("**Carta TradingView:**")
-        cols_tv = st.columns(6)
-        for idx, t_name in enumerate(st.session_state.raw_tickers):
-            tv_url = f"https://www.tradingview.com/chart/?symbol=MYX%3A{t_name}"
-            with cols_tv[idx % 6]:
-                st.markdown(f"👉 [{t_name}]({tv_url})")
-
-        csv_bytes = df_res.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Muat Turun CSV", data=csv_bytes, file_name="myx_screener.csv", mime="text/csv")
-    else:
-        st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
+            if
