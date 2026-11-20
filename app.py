@@ -791,4 +791,3 @@ else:
         st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
 
 
-*Peringatan:* Pastikan anda menyalin dari baris `import base64` hingga ke baris `st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")` sahaja sebelum *commit* ke GitHub supaya tiada teks tambahan di bawah[cite: 2, 10, 11].
