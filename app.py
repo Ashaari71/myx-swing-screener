@@ -773,8 +773,7 @@ else:
         st.info("Klik **Mula Imbas Pasaran Sekarang** untuk melihat hasil.")
 
 
-<ElicitationsGroup message="Selepas kod penuh ini di-commit ke app.py:">
   <Elicitation label="Cegah Telegram berulang" query="Tambahkan kod untuk mencegah notifikasi Telegram yang sama dihantar berulang kali pada hari yang sama."/>
   <Elicitation label="Tambah butang reset sejarah AI" query="Tambahkan butang untuk mengosongkan sejarah analisis carta sesi ini dalam AI Chart Vision."/>
   <Elicitation label="Uji & perhalusi penapis" query="Bagaimana nak semak jika penapis BOB atau BOD ini terlalu ketat atau terlalu longgar pada carta sebenar?"/>
-</ElicitationsGroup>
+
