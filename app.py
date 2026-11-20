@@ -17,7 +17,7 @@ except Exception:
 st.set_page_config(page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide")
 
 st.title("📈 MYX Swing Pro: Screener, Heatmap, AI Vision & Watchlist")
-st.caption("Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL), Imbasan Penuh Mengikut Sektor & Heatmap")
+st.caption("Penapis Uptrend Patuh Syariah (EMA20/EMA50/RSI/RVOL/52WH), Imbasan Penuh Mengikut Sektor & Heatmap")
 
 NON_SHARIAH_EXCLUDED = {
     "MAYBANK", "CIMB", "PBBANK", "HLBANK", "RHBBANK", "AMBANK",
@@ -62,6 +62,7 @@ def fetch_tradingview_scanner(tickers):
             "close", "change", "volume", "RSI",
             "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
             "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc",
+            "price_52_week_high",
         ],
     }
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -86,6 +87,7 @@ def fetch_tradingview_scanner(tickers):
                     "bb_lower": vals[7] if len(vals) > 7 and vals[7] is not None else 0.0,
                     "ema20": vals[8] if len(vals) > 8 and vals[8] is not None else 0.0,
                     "ema50": vals[9] if len(vals) > 9 and vals[9] is not None else 0.0,
+                    "high_52w": vals[12] if len(vals) > 12 and vals[12] is not None else 0.0,
                 }
             return results
     except Exception:
@@ -103,7 +105,8 @@ def fetch_sector_all_stocks(sector_label, limit=120):
         "columns": [
             "name", "close", "change", "volume", "RSI",
             "MACD.macd", "MACD.signal", "BB.upper", "BB.lower",
-            "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc", "sector",
+            "EMA20", "EMA50", "volume[1]", "relative_volume_10d_calc",
+            "price_52_week_high", "sector",
         ],
         "filter": [{"left": "sector", "operation": "in_range", "right": tv_sectors}] if tv_sectors else [],
         "sort": {"sortBy": "volume", "sortOrder": "desc"},
@@ -130,6 +133,7 @@ def fetch_sector_all_stocks(sector_label, limit=120):
                     "ema50": vals[10] if len(vals) > 10 and vals[10] is not None else 0.0,
                     "prev_volume": vals[11] if len(vals) > 11 and vals[11] is not None else 0,
                     "rvol": vals[12] if len(vals) > 12 and vals[12] is not None else 0.0,
+                    "high_52w": vals[13] if len(vals) > 13 and vals[13] is not None else 0.0,
                 }
     except Exception:
         pass
@@ -160,6 +164,8 @@ min_rvol = st.sidebar.slider("RVOL Minimum (10D)", 0.0, 3.0, 0.0, 0.1)
 filter_vol_higher = st.sidebar.checkbox("Hanya Volum > Volum Sebelumnya", value=False)
 filter_macd = st.sidebar.checkbox("Hanya MACD Bullish Crossover", value=False)
 filter_bb_squeeze = st.sidebar.checkbox("Hanya Bollinger Bands Squeeze", value=False)
+filter_52wh = st.sidebar.checkbox("Hanya Dekat / Breakout 52WH", value=False)
+max_52wh_dist_pct = st.sidebar.slider("Jarak Maksimum Dari 52WH (%)", 0.0, 15.0, 3.0, 0.5)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 OpenAI & Telegram")
@@ -309,6 +315,7 @@ else:
             vol = info["volume"]
             prev_vol = info["prev_volume"]
             rvol = info["rvol"]
+            high_52w = info.get("high_52w", 0.0)
             sec_name = sel_sec if (scan_mode == "📂 Ikut Sektor" and sel_sec) else ticker_to_sector.get(t, "Lain-lain")
 
             heatmap_rows.append({
@@ -325,6 +332,13 @@ else:
                 continue
             if min_rvol > 0 and rvol < min_rvol:
                 continue
+
+            if filter_52wh:
+                if high_52w <= 0:
+                    continue
+                dist_52wh_pct = ((high_52w - price) / high_52w) * 100.0
+                if dist_52wh_pct > max_52wh_dist_pct:
+                    continue
 
             is_up = semak_uptrend_menaik(info, rsi_min=min_rsi, rsi_max=max_rsi)
             if filter_uptrend_only:
@@ -343,6 +357,13 @@ else:
                 if (info["bb_upper"] - info["bb_lower"]) / price > 0.08:
                     continue
 
+            if high_52w > 0 and price >= high_52w:
+                jarak_52wh_str = "🔥 Breakout 52WH"
+            elif high_52w > 0 and price > 0:
+                jarak_52wh_str = f"-{((high_52w - price) / high_52w) * 100.0:.1f}%"
+            else:
+                jarak_52wh_str = "-"
+
             if is_up and change >= 2.0 and vol > 500000:
                 fokus = "🔥 Kaji BOB"
             elif is_up and -1.5 <= change < 2.0 and vol > 300000:
@@ -356,6 +377,8 @@ else:
                 "Kaunter": t,
                 "Sektor": sec_name,
                 "Harga (RM)": round(price, 2),
+                "52WH (RM)": round(high_52w, 2) if high_52w > 0 else 0.0,
+                "Jarak 52WH": jarak_52wh_str,
                 "Perubahan": f"{'+' if change >= 0 else ''}{change:.2f}%",
                 "RSI": round(rsi_val, 1),
                 "RVOL": f"{rvol:.2f}x" if rvol > 0 else "-",
@@ -363,7 +386,7 @@ else:
                 "Fokus": fokus,
             })
             if is_up:
-                alerts.append(f"• *{t}* | RM {price:.2f} | RSI {rsi_val:.1f} | {fokus}")
+                alerts.append(f"• *{t}* | RM {price:.2f} | 52WH: {jarak_52wh_str} | RSI {rsi_val:.1f} | {fokus}")
 
         st.session_state.scan_results = rows
         st.session_state.raw_tickers = [r["Kaunter"] for r in rows]
