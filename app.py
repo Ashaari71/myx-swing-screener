@@ -1,5 +1,5 @@
 import base64
-import io
+import io 
 import os
 import re
 import time
@@ -10,7 +10,18 @@ import plotly.express as px
 import requests
 import streamlit as st
 from PIL import Image
+WATCHLIST_FILE = Path("watchlist.json")
 
+
+def muat_watchlist_awal() -> list[str]:
+  if WATCHLIST_FILE.exists():
+    try:
+      data = json.loads(WATCHLIST_FILE.read_text(encoding="utf-8"))
+      if isinstance(data, list):
+        return [str(item).strip().upper() for item in data if str(item).strip()]
+    except Exception:
+      pass
+  return []
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
@@ -442,13 +453,56 @@ if app_mode == "🔗 Pautan Rasmi":
     st.markdown("* [Senarai Patuh Syariah SC](https://www.sc.com.my/development/icm/shariah-compliant-securities/list-of-shariah-compliant-securities)")
 
 elif app_mode == "⭐ Watchlist":
-    if st.session_state.watchlist:
-        st.dataframe(pd.DataFrame(st.session_state.watchlist), use_container_width=True, hide_index=True)
-        if st.button("🗑️ Kosongkan Watchlist"):
-            st.session_state.watchlist = []
-            st.rerun()
-    else:
-        st.info("Watchlist masih kosong.")
+  if "watchlist" not in st.session_state:
+    st.session_state.watchlist = muat_watchlist_awal()
+
+  # Pilihan tambah kaunter baru ke watchlist
+  tambah_wl = (
+      st.text_input("Tambah Kaunter (.KL):", placeholder="cth: 0128.KL")
+      .strip()
+      .upper()
+  )
+  if st.button("➕ Tambah Kaunter") and tambah_wl:
+    if not tambah_wl.endswith(".KL"):
+      tambah_wl = f"{tambah_wl}.KL"
+    if tambah_wl not in st.session_state.watchlist:
+      st.session_state.watchlist.append(tambah_wl)
+      st.rerun()
+
+  if st.session_state.watchlist:
+    st.dataframe(
+        pd.DataFrame({"Kaunter": st.session_state.watchlist}),
+        use_container_width=True,
+        hide_index=True,
+    )
+    if st.button("🗑️ Kosongkan Watchlist"):
+      st.session_state.watchlist = []
+      st.rerun()
+  else:
+    st.info("Watchlist masih kosong.")
+
+  # Simpan ke fail JSON untuk dimuat naik ke GitHub apabila mahu kekal
+  json_data = json.dumps(st.session_state.watchlist, indent=2).encode("utf-8")
+  st.download_button(
+      label="💾 Muat Turun watchlist.json",
+      data=json_data,
+      file_name="watchlist.json",
+      mime="application/json",
+  )
+
+  # Muat naik fail watchlist.json jika mahu pulihkan senarai
+  fail_wl = st.file_uploader("Muat naik watchlist.json", type=["json"])
+  if fail_wl is not None:
+    try:
+      data_baru = json.load(fail_wl)
+      if isinstance(data_baru, list):
+        st.session_state.watchlist = [
+            str(x).strip().upper() for x in data_baru if str(x).strip()
+        ]
+        st.success("Watchlist berjaya dimuat naik.")
+        st.rerun()
+    except Exception as e:
+      st.error(f"Ralat fail JSON: {e}")
 
 elif app_mode == "📸 AI Chart Vision":
     st.subheader("Penapis Ketat Carta AI (BOB / BOD & Kebarangkalian Hala Tuju)")
