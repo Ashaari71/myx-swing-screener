@@ -9,7 +9,8 @@ import pandas as pd
 import plotly.express as px
 import requests
 import streamlit as st
-from PIL import Image
+from PIL import Image 
+from pathlib import Path
 WATCHLIST_FILE = Path("watchlist.json")
 from pathlib import Path
 
