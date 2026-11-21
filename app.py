@@ -11,7 +11,7 @@ import requests
 import streamlit as st
 from PIL import Image
 WATCHLIST_FILE = Path("watchlist.json")
-
+from pathlib import Path
 
 def muat_watchlist_awal() -> list[str]:
   if WATCHLIST_FILE.exists():
