@@ -10,8 +10,8 @@ st.set_page_config(page_title="MYX Swing Pro Screener & Chart", layout="wide")
 
 st.title("📈 MYX Swing Pro: BOB & BOD Screener + RSI Momentum")
 st.caption(
-    "Imbasan automatik kaunter Bursa Malaysia dengan penapis volum, RSI,"
-    " anggaran ATR Stop-Loss/TP1, carta teknikal & unjuran regresi linear."
+    "Imbasan automatik kaunter Bursa Malaysia dengan penapis volum fleksibel,"
+    " status WATCH/BOB/BOD, ATR Stop-Loss/TP1, carta & unjuran linear."
 )
 
 # --- Sidebar: Tetapan & Penapis Lanjutan ---
@@ -39,11 +39,17 @@ raw_tickers_input = st.sidebar.text_area(
 )
 
 vol_mult_min = st.sidebar.slider(
-    "Gandaan Volume Minimum (vs Purata 20H)",
+    "Gandaan Volume Rujukan (vs Purata 20H)",
     min_value=0.50,
     max_value=5.00,
-    value=1.50,
+    value=1.20,
     step=0.05,
+)
+
+include_watch = st.sidebar.checkbox(
+    "Papar Kaunter WATCH (Walaupun Volum/Setup Belum Penuh)",
+    value=True,
+    help="Jika diaktifkan, kaunter yang melepasi harga minimum & had RSI tetapi volum lebih rendah akan dipaparkan sebagai WATCH.",
 )
 
 min_price = st.sidebar.number_input(
@@ -54,7 +60,7 @@ max_rsi = st.sidebar.slider(
     "Had Maksimum RSI (Elak Overbought Ekstrem)",
     min_value=50.0,
     max_value=95.0,
-    value=75.0,
+    value=85.0,
     step=1.0,
 )
 
@@ -129,19 +135,22 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
   ).max(axis=1)
   out["ATR14"] = tr.rolling(14).mean()
 
-  # Struktur lilin & isyarat BOB / BOD asas
+  # Struktur lilin & isyarat BOB / BOD yang lebih fleksibel
   rng = (out["High"] - out["Low"]).replace(0, np.nan)
   body = (out["Close"] - out["Open"]).abs()
   out["BodyRatio"] = (body / rng).fillna(0.0)
-  bullish_candle = (out["Close"] > out["Open"]) & (out["BodyRatio"] >= 0.45)
+  bullish_candle = (out["Close"] > out["Open"]) & (out["BodyRatio"] >= 0.35)
 
   high_20_prev = out["High"].shift(1).rolling(20).max()
-  out["BOB"] = bullish_candle & (out["Close"] > high_20_prev)
+  out["BOB"] = bullish_candle & (out["Close"] >= high_20_prev * 0.995)
 
-  near_support = (out["Low"] <= out["EMA20"] * 1.015) & (
-      out["Close"] >= out["EMA20"] * 0.99
+  near_ema20 = (out["Low"] <= out["EMA20"] * 1.02) & (
+      out["Close"] >= out["EMA20"] * 0.985
   )
-  out["BOD"] = bullish_candle & near_support & (out["Close"] >= out["EMA50"] * 0.98)
+  near_ema50 = (out["Low"] <= out["EMA50"] * 1.02) & (
+      out["Close"] >= out["EMA50"] * 0.985
+  )
+  out["BOD"] = bullish_candle & (near_ema20 | near_ema50)
 
   return out
 
@@ -185,6 +194,7 @@ def scan_tickers(
     vol_thr: float,
     price_thr: float,
     rsi_cap: float,
+    allow_watch: bool,
 ) -> pd.DataFrame:
   rows = []
   for sym in tickers:
@@ -204,18 +214,23 @@ def scan_tickers(
         float(last["ATR14"]) if pd.notna(last["ATR14"]) else close_val * 0.03
     )
 
-    if close_val < price_thr:
-      continue
-    if rvol_val < vol_thr:
-      continue
-    if rsi_val > rsi_cap:
+    # Penapis asas: harga minimum & had maksimum RSI
+    if close_val < price_thr or rsi_val > rsi_cap:
       continue
 
-    setup = (
-        "BOB"
-        if bool(last["BOB"])
-        else ("BOD" if bool(last["BOD"]) else "WATCH")
-    )
+    vol_ok = rvol_val >= vol_thr
+    has_bob = bool(last["BOB"]) and vol_ok
+    has_bod = bool(last["BOD"]) and vol_ok
+
+    if has_bob:
+      setup = "BOB"
+    elif has_bod:
+      setup = "BOD"
+    elif allow_watch or vol_ok:
+      setup = "WATCH"
+    else:
+      continue
+
     stop_loss = max(0.005, close_val - (1.5 * atr_val))
     tp1 = close_val + (2.0 * atr_val)
 
@@ -232,7 +247,7 @@ def scan_tickers(
 
   if not rows:
     return pd.DataFrame()
-  return pd.DataFrame(rows).sort_values(by="RVOL", ascending=False)
+  return pd.DataFrame(rows).sort_values(by=["Setup", "RVOL"], ascending=[True, False])
 
 
 # --- Antaramuka Utama (Tab Screener & Tab Carta + Ramalan) ---
@@ -246,15 +261,21 @@ with tab_scan:
   if run_scan:
     with st.spinner("Mengimbas kaunter yang dipilih..."):
       scan_df = scan_tickers(
-          ticker_list, period, interval, vol_mult_min, min_price, max_rsi
+          ticker_list,
+          period,
+          interval,
+          vol_mult_min,
+          min_price,
+          max_rsi,
+          include_watch,
       )
     if scan_df.empty:
       st.warning(
-          "Tiada kaunter melepasi syarat penapis semasa. Cuba turunkan"
-          " Gandaan Volume Minimum atau laraskan Had Maksimum RSI."
+          "Tiada kaunter melepasi syarat harga minimum atau had maksimum RSI"
+          " semasa."
       )
     else:
-      st.success(f"Ditemui {len(scan_df)} kaunter melepasi penapis.")
+      st.success(f"Ditemui {len(scan_df)} kaunter dalam senarai hasil.")
       st.dataframe(scan_df, use_container_width=True, hide_index=True)
   else:
     st.info(
@@ -294,7 +315,7 @@ with tab_chart:
     st_label = (
         "BOB"
         if bool(latest["BOB"])
-        else ("BOD" if bool(latest["BOD"]) else "STANDBY")
+        else ("BOD" if bool(latest["BOD"]) else "WATCH")
     )
 
     m1, m2, m3, m4 = st.columns(4)
