@@ -2,332 +2,328 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from sklearn.linear_model import LinearRegression
+from statsmodels.tsa.holtwinters import Holt
 import streamlit as st
 import yfinance as yf
 
-st.set_page_config(page_title="MYX Swing Pro Screener & Chart", layout="wide")
+st.set_page_config(
+    page_title="MYX Swing Pro Screener", page_icon="📈", layout="wide"
+)
 
 st.title("📈 MYX Swing Pro: BOB & BOD Screener + RSI Momentum")
-st.caption(
-    "Imbasan automatik kaunter Bursa Malaysia dengan penapis volum fleksibel,"
-    " status WATCH/BOB/BOD, ATR Stop-Loss/TP1, carta & unjuran linear."
+st.markdown(
+    "Sistem imbasan automatik lanjutan lengkap dengan penapis RSI, pengiraan"
+    " ATR Stop-Loss, sasaran untung (TP1), carta teknikal & unjuran Holt's Trend."
 )
 
-# --- Sidebar: Tetapan & Penapis Lanjutan ---
-st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
-
-sector_presets = {
-    "Pembinaan & Infrastruktur (Construction)": (
+# --- KAMUS SEKTOR BERPOTENSI DI BURSA MALAYSIA ---
+sector_dict = {
+    "🔥 Pembinaan & Infrastruktur (Construction)": (
         "GAMUDA.KL, SUNCON.KL, IJM.KL, MRCB.KL, WCT.KL, KERJAYA.KL"
     ),
-    "Teknologi (Technology)": "INARI.KL, FRONTKN.KL, GREATEC.KL, VITROX.KL, MI.KL",
-    "Tenaga & Utiliti": "TENAGA.KL, YINSON.KL, DIALOG.KL, PEKAT.KL, SAMAIDEN.KL",
-    "Penjagaan Kesihatan & Lain-lain": "KPJ.KL, IHH.KL, MAXIS.KL, TOPGLOV.KL",
+    "⚡ Tenaga Boleh Baharu & Utiliti (Energy/RE)": (
+        "SAMAIDEN.KL, PEKAT.KL, TENAGA.KL, YTLPOWR.KL, MEGAFB.KL"
+    ),
+    "💻 Teknologi & Semikonduktor (Tech)": (
+        "FRONTKN.KL, INARI.KL, KGB.KL, MYEG.KL, PENTA.KL, MPI.KL, UNISEM.KL"
+    ),
+    "🏥 Penjagaan Kesihatan (Healthcare)": (
+        "KPJ.KL, IHH.KL, TOPGLOV.KL, HARTALEGA.KL"
+    ),
+    "🌾 Perladangan & Komoditi (Plantation)": (
+        "KLK.KL, SDG.KL, IOICORP.KL, FGV.KL, HAPSENG.KL"
+    ),
+    "⚙️ Perindustrian & Telco (Industrial/Telco)": (
+        "TMK.KL, CDB.KL, MAXIS.KL, SIME.KL, PMETAL.KL"
+    ),
+    "✨ Watchlist Utama Saya": (
+        "TMK.KL, PEKAT.KL, KPJ.KL, SUNCON.KL, SAMAIDEN.KL, MAXIS.KL, TOPGLOV.KL, PJBUMI.KL"
+    ),
 }
 
+# --- SIDEBAR: TETAPAN ---
+st.sidebar.header("⚙️ Tetapan & Penapis Lanjutan")
+
 selected_sector = st.sidebar.selectbox(
-    "Pilih Sektor Pasaran:", list(sector_presets.keys()), index=0
+    "Pilih Sektor Pasaran:", list(sector_dict.keys())
 )
-default_tickers_str = sector_presets[selected_sector]
-
-raw_tickers_input = st.sidebar.text_area(
-    "Senarai Kod Kaunter:",
-    value=default_tickers_str,
-    height=110,
-    help="Pisahkan simbol dengan koma atau baris baharu, contoh: SUNCON.KL, GAMUDA.KL",
+default_tickers_for_sector = sector_dict[selected_sector]
+ticker_input = st.sidebar.text_area(
+    "Senarai Kod Kaunter:", default_tickers_for_sector
 )
 
-vol_mult_min = st.sidebar.slider(
-    "Gandaan Volume Rujukan (vs Purata 20H)",
-    min_value=0.50,
-    max_value=5.00,
-    value=1.20,
-    step=0.05,
+vol_mult = st.sidebar.slider(
+    "Gandaan Volume Minimum (vs Purata 20H)", 0.8, 3.0, 1.2, 0.1
 )
-
-include_watch = st.sidebar.checkbox(
-    "Papar Kaunter WATCH (Walaupun Volum/Setup Belum Penuh)",
-    value=True,
-    help="Jika diaktifkan, kaunter yang melepasi harga minimum & had RSI tetapi volum lebih rendah akan dipaparkan sebagai WATCH.",
-)
-
 min_price = st.sidebar.number_input(
-    "Harga Minimum (RM)", min_value=0.0, max_value=100.0, value=0.20, step=0.05
+    "Harga Minimum (RM)", value=0.20, step=0.05
 )
-
 max_rsi = st.sidebar.slider(
-    "Had Maksimum RSI (Elak Overbought Ekstrem)",
-    min_value=50.0,
-    max_value=95.0,
-    value=85.0,
-    step=1.0,
+    "Had Maksimum RSI (Elak Overbought Ekstrem)", 50, 95, 85, 1
+)
+include_watch = st.sidebar.checkbox(
+    "Sertakan Kaunter WATCH (Jika Volum/Breakout Belum Penuh)", value=True
 )
 
-st.sidebar.subheader("📐 Tetapan Carta & Ramalan Trend")
-period = st.sidebar.selectbox(
-    "Tempoh Data Sejarah", ["3mo", "6mo", "1y", "2y"], index=1
+st.sidebar.subheader("📈 Tetapan Carta & Kaedah Ramalan")
+forecast_method = st.sidebar.selectbox(
+    "Kaedah Unjuran Harga:",
+    ["Holt's Exponential Smoothing (Damped)", "Holt's Linear Trend", "EMA Momentum Projection"],
+    index=0,
+    help="Holt's Damped lebih selamat untuk saham kerana meredakan unjuran yang terlalu ekstrem."
 )
-interval = st.sidebar.selectbox(
-    "Selang Masa (Interval)", ["1d", "1h", "15m"], index=0
+lookback_trend = st.sidebar.slider(
+    "Bilangan Hari Sejarah untuk Model", 20, 120, 45, 5
 )
-lookback_bars = st.sidebar.slider(
-    "Bilangan Bar Terakhir (Fit Trend)", min_value=10, max_value=90, value=30, step=5
-)
-forecast_steps = st.sidebar.slider(
-    "Langkah Ramalan ke Hadapan", min_value=1, max_value=15, value=5, step=1
+forecast_days = st.sidebar.slider(
+    "Unjuran Hari ke Hadapan", 1, 15, 5, 1
 )
 
 run_scan = st.sidebar.button("🚀 Mula Imbas Pasaran Pro", type="primary")
 
 
-def parse_tickers(text: str) -> list[str]:
-  parts = [
-      t.strip().upper() for t in text.replace("\n", ",").split(",") if t.strip()
-  ]
-  seen = []
-  for p in parts:
-    if p not in seen:
-      seen.append(p)
-  return seen
-
-
 @st.cache_data(ttl=300)
-def fetch_ohlcv(symbol: str, per: str, inter: str) -> pd.DataFrame:
-  df = yf.download(symbol, period=per, interval=inter, progress=False)
-  if df is None or df.empty:
+def get_stock_df(ticker: str) -> pd.DataFrame:
+  df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+  if df is None or df.empty or len(df) < 30:
     return pd.DataFrame()
   if isinstance(df.columns, pd.MultiIndex):
     df.columns = df.columns.get_level_values(0)
-  required = ["Open", "High", "Low", "Close", "Volume"]
-  if not all(col in df.columns for col in required):
-    return pd.DataFrame()
-  df = df.dropna(subset=required).copy()
+  df = df.dropna(subset=["Open", "High", "Low", "Close", "Volume"]).copy()
   df.index = pd.to_datetime(df.index)
   return df
 
 
-def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def enrich_indicators(df: pd.DataFrame) -> pd.DataFrame:
   out = df.copy()
   out["EMA20"] = out["Close"].ewm(span=20, adjust=False).mean()
   out["EMA50"] = out["Close"].ewm(span=50, adjust=False).mean()
+  out["SMA200"] = (
+      out["Close"].rolling(window=200).mean()
+      if len(out) >= 200
+      else out["Close"].rolling(window=len(out)).mean()
+  )
+  out["AvgVol20"] = out["Volume"].rolling(window=20).mean()
+  out["RVOL"] = out["Volume"] / out["AvgVol20"].replace(0, np.nan)
 
-  # RSI (14)
+  high_low = out["High"] - out["Low"]
+  high_close = np.abs(out["High"] - out["Close"].shift())
+  low_close = np.abs(out["Low"] - out["Close"].shift())
+  true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+  out["ATR"] = true_range.rolling(window=14).mean()
+
   delta = out["Close"].diff()
-  gain = delta.clip(lower=0).rolling(14).mean()
-  loss = (-delta.clip(upper=0)).rolling(14).mean()
+  gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+  loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
   rs = gain / loss.replace(0, np.nan)
-  out["RSI14"] = 100 - (100 / (1 + rs))
-
-  # RVOL (20)
-  vol_avg20 = out["Volume"].rolling(20).mean()
-  out["RVOL"] = out["Volume"] / vol_avg20.replace(0, np.nan)
-
-  # ATR (14) untuk rujukan Stop-Loss / TP1
-  prev_close = out["Close"].shift(1)
-  tr = pd.concat(
-      [
-          (out["High"] - out["Low"]).abs(),
-          (out["High"] - prev_close).abs(),
-          (out["Low"] - prev_close).abs(),
-      ],
-      axis=1,
-  ).max(axis=1)
-  out["ATR14"] = tr.rolling(14).mean()
-
-  # Struktur lilin & isyarat BOB / BOD yang lebih fleksibel
-  rng = (out["High"] - out["Low"]).replace(0, np.nan)
-  body = (out["Close"] - out["Open"]).abs()
-  out["BodyRatio"] = (body / rng).fillna(0.0)
-  bullish_candle = (out["Close"] > out["Open"]) & (out["BodyRatio"] >= 0.35)
-
-  high_20_prev = out["High"].shift(1).rolling(20).max()
-  out["BOB"] = bullish_candle & (out["Close"] >= high_20_prev * 0.995)
-
-  near_ema20 = (out["Low"] <= out["EMA20"] * 1.02) & (
-      out["Close"] >= out["EMA20"] * 0.985
-  )
-  near_ema50 = (out["Low"] <= out["EMA50"] * 1.02) & (
-      out["Close"] >= out["EMA50"] * 0.985
-  )
-  out["BOD"] = bullish_candle & (near_ema20 | near_ema50)
-
+  out["RSI"] = 100 - (100 / (1 + rs))
   return out
 
 
-def forecast_linear_trend(
-    df: pd.DataFrame, lookback: int, steps: int, inter: str
+def forecast_prices(
+    df: pd.DataFrame, lookback: int, steps: int, method: str
 ) -> pd.DataFrame:
   sub = df.tail(lookback).copy()
-  x = np.arange(len(sub)).reshape(-1, 1)
   y = sub["Close"].to_numpy(dtype=float)
 
-  model = LinearRegression()
-  model.fit(x, y)
-
-  future_x = np.arange(len(sub), len(sub) + steps).reshape(-1, 1)
-  future_y = model.predict(future_x)
-
-  last_ts = df.index[-1]
-  if isinstance(last_ts, pd.DatetimeIndex):
-    last_ts = last_ts[-1]
-
-  if inter == "1d":
-    freq = "B"
-  elif inter == "1h":
-    freq = "h"
+  if "Holt's" in method:
+    is_damped = "Damped" in method
+    model = Holt(y, damped_trend=is_damped, initialization_method="estimated")
+    fit = model.fit(optimized=True)
+    future_y = fit.forecast(steps)
   else:
-    freq = "15min"
+    # EMA Momentum Projection: unjurkan berdasarkan purata perubahan harian EMA20 terkini
+    ema_series = sub["EMA20"].to_numpy(dtype=float)
+    slope = (ema_series[-1] - ema_series[-5]) / 5.0 if len(ema_series) >= 5 else 0.0
+    future_y = np.array([y[-1] + (slope * (i + 1)) for i in range(steps)])
 
+  # Pastikan unjuran tidak jatuh ke paras negatif
+  future_y = np.maximum(0.005, future_y)
+
+  last_date = df.index[-1]
   future_dates = pd.date_range(
-      start=last_ts + pd.tseries.frequencies.to_offset(freq),
+      start=last_date + pd.tseries.frequencies.to_offset("B"),
       periods=steps,
-      freq=freq,
+      freq="B",
   )
-  return pd.DataFrame({"Date": future_dates, "Forecast_Close": future_y})
+  return pd.DataFrame({"Tarikh": future_dates, "Ramalan (RM)": future_y})
 
 
-def scan_tickers(
-    tickers: list[str],
-    per: str,
-    inter: str,
-    vol_thr: float,
-    price_thr: float,
-    rsi_cap: float,
-    allow_watch: bool,
-) -> pd.DataFrame:
-  rows = []
-  for sym in tickers:
-    raw = fetch_ohlcv(sym, per, inter)
-    if raw.empty or len(raw) < 25:
-      continue
-    ind = add_indicators(raw)
-    last = ind.iloc[-1]
-    prev = ind.iloc[-2]
+tickers = [
+    t.strip().upper().replace(" ", "")
+    for t in ticker_input.replace("\n", ",").split(",")
+    if t.strip()
+]
 
-    close_val = float(last["Close"])
-    prev_val = float(prev["Close"]) if float(prev["Close"]) != 0 else close_val
-    chg_pct = ((close_val - prev_val) / prev_val) * 100
-    rvol_val = float(last["RVOL"]) if pd.notna(last["RVOL"]) else 0.0
-    rsi_val = float(last["RSI14"]) if pd.notna(last["RSI14"]) else 50.0
-    atr_val = (
-        float(last["ATR14"]) if pd.notna(last["ATR14"]) else close_val * 0.03
-    )
-
-    # Penapis asas: harga minimum & had maksimum RSI
-    if close_val < price_thr or rsi_val > rsi_cap:
-      continue
-
-    vol_ok = rvol_val >= vol_thr
-    has_bob = bool(last["BOB"]) and vol_ok
-    has_bod = bool(last["BOD"]) and vol_ok
-
-    if has_bob:
-      setup = "BOB"
-    elif has_bod:
-      setup = "BOD"
-    elif allow_watch or vol_ok:
-      setup = "WATCH"
-    else:
-      continue
-
-    stop_loss = max(0.005, close_val - (1.5 * atr_val))
-    tp1 = close_val + (2.0 * atr_val)
-
-    rows.append({
-        "Kaunter": sym,
-        "Harga": round(close_val, 3),
-        "Perubahan %": round(chg_pct, 2),
-        "RVOL": round(rvol_val, 2),
-        "RSI(14)": round(rsi_val, 1),
-        "Setup": setup,
-        "Est. SL (1.5 ATR)": round(stop_loss, 3),
-        "Est. TP1 (2.0 ATR)": round(tp1, 3),
-    })
-
-  if not rows:
-    return pd.DataFrame()
-  return pd.DataFrame(rows).sort_values(by=["Setup", "RVOL"], ascending=[True, False])
-
-
-# --- Antaramuka Utama (Tab Screener & Tab Carta + Ramalan) ---
-tab_scan, tab_chart = st.tabs(
-    ["🔍 Screener BOB & BOD", "📊 Carta & Ramalan Trend"]
+tab_screener, tab_chart = st.tabs(
+    ["📋 Hasil Imbasan Screener", "📊 Carta & Ramalan Trend"]
 )
 
-ticker_list = parse_tickers(raw_tickers_input)
-
-with tab_scan:
+with tab_screener:
   if run_scan:
-    with st.spinner("Mengimbas kaunter yang dipilih..."):
-      scan_df = scan_tickers(
-          ticker_list,
-          period,
-          interval,
-          vol_mult_min,
-          min_price,
-          max_rsi,
-          include_watch,
+    scan_results = []
+    skipped_tickers = []
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    total = max(1, len(tickers))
+    for idx, ticker in enumerate(tickers):
+      status_text.text(f"Sedang mengimbas [{idx+1}/{total}]: {ticker}...")
+
+      try:
+        raw_df = get_stock_df(ticker)
+        if raw_df.empty:
+          skipped_tickers.append(ticker)
+          continue
+
+        df = enrich_indicators(raw_df)
+        last_close = float(df["Close"].iloc[-1])
+        last_vol = float(df["Volume"].iloc[-1])
+        avg_vol = (
+            float(df["AvgVol20"].iloc[-1])
+            if pd.notna(df["AvgVol20"].iloc[-1])
+            else 0.0
+        )
+        rvol = float(df["RVOL"].iloc[-1]) if pd.notna(df["RVOL"].iloc[-1]) else 0.0
+        ema20 = float(df["EMA20"].iloc[-1])
+        ema50 = float(df["EMA50"].iloc[-1])
+        sma200 = (
+            float(df["SMA200"].iloc[-1])
+            if not np.isnan(df["SMA200"].iloc[-1])
+            else ema50
+        )
+        atr = (
+            float(df["ATR"].iloc[-1])
+            if pd.notna(df["ATR"].iloc[-1])
+            else last_close * 0.03
+        )
+        rsi = float(df["RSI"].iloc[-1]) if pd.notna(df["RSI"].iloc[-1]) else 50.0
+
+        if last_close < min_price or rsi > max_rsi:
+          continue
+
+        is_uptrend = (
+            (last_close > ema20)
+            and (ema20 > ema50)
+            and (last_close >= sma200 * 0.98)
+        )
+        vol_spike = avg_vol > 0 and (last_vol >= avg_vol * vol_mult)
+
+        highest_base = float(df["High"].iloc[-21:-1].max())
+        lowest_base = float(df["Low"].iloc[-21:-1].min())
+        base_range_pct = (
+            (highest_base - lowest_base) / lowest_base
+            if lowest_base > 0
+            else 1.0
+        )
+
+        is_bob = (
+            is_uptrend
+            and (base_range_pct <= 0.25)
+            and (last_close >= highest_base * 0.995)
+            and vol_spike
+        )
+        recent_high = float(df["High"].iloc[-10:-2].max())
+        is_bod = (
+            (last_close > ema50)
+            and (last_close > recent_high)
+            and vol_spike
+            and not is_bob
+        )
+
+        signal = "-"
+        if is_bob:
+          signal = "🔥 BOB (Breakout of Base)"
+        elif is_bod:
+          signal = "⚡ BOD (Breakout of Downtrend)"
+        elif is_uptrend and vol_spike:
+          signal = "✨ Volume Spike (Potensi)"
+        elif include_watch:
+          signal = "👀 WATCH (Pantauan)"
+
+        if signal != "-":
+          stop_loss = round(max(0.005, last_close - (atr * 1.5)), 3)
+          tp1 = round(
+              last_close + (max(0.01, last_close - stop_loss) * 1.5), 3
+          )
+
+          scan_results.append({
+              "Kaunter": ticker.replace(".KL", ""),
+              "Harga (RM)": round(last_close, 3),
+              "RVOL": round(rvol, 2),
+              "Status Isyarat": signal,
+              "RSI (14)": round(rsi, 1),
+              "Volume Terkini": int(last_vol),
+              "Cadangan Stop-Loss (RM)": stop_loss,
+              "Sasaran Untung (TP1)": tp1,
+          })
+      except Exception:
+        skipped_tickers.append(ticker)
+
+      progress_bar.progress((idx + 1) / total)
+
+    status_text.text("Imbasan selesai!")
+
+    if scan_results:
+      st.success(
+          f"Berjaya memaparkan {len(scan_results)} kaunter mengikut tetapan"
+          " semasa!"
       )
-    if scan_df.empty:
-      st.warning(
-          "Tiada kaunter melepasi syarat harga minimum atau had maksimum RSI"
-          " semasa."
+      result_df = pd.DataFrame(scan_results)
+      st.dataframe(result_df, use_container_width=True, hide_index=True)
+
+      csv_data = result_df.to_csv(index=False).encode("utf-8")
+      st.download_button(
+          label="📥 Muat Turun Laporan Pro (CSV)",
+          data=csv_data,
+          file_name=f"bursa_pro_{selected_sector[:10].strip()}.csv",
+          mime="text/csv",
       )
     else:
-      st.success(f"Ditemui {len(scan_df)} kaunter dalam senarai hasil.")
-      st.dataframe(scan_df, use_container_width=True, hide_index=True)
+      st.warning(
+          "Tiada kaunter yang memenuhi kriteria dengan penapis semasa."
+      )
+
+    if skipped_tickers:
+      st.caption(
+          "Kaunter tiada data / dilangkau: " + ", ".join(skipped_tickers)
+      )
   else:
     st.info(
-        "Pilih sektor atau ubah senarai kaunter di sidebar, kemudian klik **Mula"
-        " Imbas Pasaran Pro**."
+        "👈 Pilih sektor, laraskan tetapan di sidebar, dan klik **Mula Imbas"
+        " Pasaran Pro**."
     )
 
 with tab_chart:
-  col_sel, col_man = st.columns([2, 1])
-  with col_sel:
-    chosen_from_list = st.selectbox(
-        "Pilih Kaunter daripada Senarai:",
-        ticker_list if ticker_list else ["SUNCON.KL"],
+  col_a, col_b = st.columns([2, 1])
+  with col_a:
+    selected_sym = st.selectbox(
+        "Pilih Kaunter untuk Carta & Ramalan:",
+        tickers if tickers else ["SUNCON.KL"],
         index=0,
     )
-  with col_man:
-    manual_sym = (
-        st.text_input("Atau Taip Simbol Manual:", value="")
+  with col_b:
+    custom_sym = (
+        st.text_input("Atau Masukkan Simbol Manual:", value="")
         .strip()
         .upper()
     )
 
-  active_sym = manual_sym if manual_sym else chosen_from_list
-  df_sym = fetch_ohlcv(active_sym, period, interval)
+  target_sym = custom_sym if custom_sym else selected_sym
+  raw_c = get_stock_df(target_sym)
 
-  if df_sym.empty:
-    st.error(f"Tiada data carta ditemui untuk **{active_sym}**.")
+  if raw_c.empty:
+    st.error(f"Tiada data carta ditemui untuk **{target_sym}**.")
   else:
-    ind_df = add_indicators(df_sym)
-    fc_df = forecast_linear_trend(ind_df, lookback_bars, forecast_steps, interval)
+    c_df = enrich_indicators(raw_c)
+    fc_df = forecast_prices(c_df, lookback_trend, forecast_days, forecast_method)
 
-    latest = ind_df.iloc[-1]
-    prev_c = (
-        ind_df["Close"].iloc[-2] if len(ind_df) > 1 else latest["Close"]
-    )
-    chg_p = ((latest["Close"] - prev_c) / prev_c * 100) if prev_c else 0.0
-    st_label = (
-        "BOB"
-        if bool(latest["BOB"])
-        else ("BOD" if bool(latest["BOD"]) else "WATCH")
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Harga Terakhir", f"{latest['Close']:.3f}", f"{chg_p:+.2f}%")
-    m2.metric(
-        "RSI (14)",
-        f"{latest['RSI14']:.1f}" if pd.notna(latest["RSI14"]) else "N/A",
-    )
-    m3.metric(
-        "RVOL", f"{latest['RVOL']:.2f}x" if pd.notna(latest["RVOL"]) else "N/A"
-    )
-    m4.metric("Status", st_label)
+    # Sambungkan titik terakhir sebenar ke titik pertama ramalan supaya garis bersambung kemas
+    last_actual_row = pd.DataFrame({
+        "Tarikh": [c_df.index[-1]],
+        "Ramalan (RM)": [float(c_df["Close"].iloc[-1])],
+    })
+    plot_fc_df = pd.concat([last_actual_row, fc_df], ignore_index=True)
 
     fig = make_subplots(
         rows=3,
@@ -336,8 +332,7 @@ with tab_chart:
         vertical_spacing=0.04,
         row_heights=[0.6, 0.2, 0.2],
         subplot_titles=(
-            f"{active_sym} ({interval}) — Candlestick, EMA 20/50 & Ramalan"
-            " Linear",
+            f"{target_sym} (1D) — Candlestick, EMA 20/50 & {forecast_method}",
             "RSI (14)",
             "RVOL",
         ),
@@ -345,11 +340,11 @@ with tab_chart:
 
     fig.add_trace(
         go.Candlestick(
-            x=ind_df.index,
-            open=ind_df["Open"],
-            high=ind_df["High"],
-            low=ind_df["Low"],
-            close=ind_df["Close"],
+            x=c_df.index,
+            open=c_df["Open"],
+            high=c_df["High"],
+            low=c_df["Low"],
+            close=c_df["Close"],
             name="Harga",
         ),
         row=1,
@@ -357,8 +352,8 @@ with tab_chart:
     )
     fig.add_trace(
         go.Scatter(
-            x=ind_df.index,
-            y=ind_df["EMA20"],
+            x=c_df.index,
+            y=c_df["EMA20"],
             mode="lines",
             name="EMA 20",
             line=dict(color="orange", width=1.5),
@@ -368,8 +363,8 @@ with tab_chart:
     )
     fig.add_trace(
         go.Scatter(
-            x=ind_df.index,
-            y=ind_df["EMA50"],
+            x=c_df.index,
+            y=c_df["EMA50"],
             mode="lines",
             name="EMA 50",
             line=dict(color="deepskyblue", width=1.5),
@@ -379,11 +374,11 @@ with tab_chart:
     )
     fig.add_trace(
         go.Scatter(
-            x=fc_df["Date"],
-            y=fc_df["Forecast_Close"],
+            x=plot_fc_df["Tarikh"],
+            y=plot_fc_df["Ramalan (RM)"],
             mode="lines+markers",
-            name="Unjuran Linear",
-            line=dict(color="mediumpurple", width=2, dash="dash"),
+            name="Unjuran Harga",
+            line=dict(color="mediumpurple", width=2.2, dash="dash"),
         ),
         row=1,
         col=1,
@@ -391,8 +386,8 @@ with tab_chart:
 
     fig.add_trace(
         go.Scatter(
-            x=ind_df.index,
-            y=ind_df["RSI14"],
+            x=c_df.index,
+            y=c_df["RSI"],
             mode="lines",
             name="RSI(14)",
             line=dict(color="gold", width=1.5),
@@ -406,8 +401,8 @@ with tab_chart:
 
     fig.add_trace(
         go.Bar(
-            x=ind_df.index,
-            y=ind_df["RVOL"],
+            x=c_df.index,
+            y=c_df["RVOL"],
             name="RVOL",
             marker_color="teal",
         ),
@@ -415,7 +410,7 @@ with tab_chart:
         col=1,
     )
     fig.add_hline(
-        y=vol_mult_min, line_dash="dash", line_color="orange", row=3, col=1
+        y=vol_mult, line_dash="dash", line_color="orange", row=3, col=1
     )
 
     fig.update_layout(
@@ -426,8 +421,8 @@ with tab_chart:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Jadual Unjuran Regresi Linear")
-    fc_show = fc_df.copy()
-    fc_show["Date"] = fc_show["Date"].dt.strftime("%Y-%m-%d %H:%M")
-    fc_show["Forecast_Close"] = fc_show["Forecast_Close"].round(3)
-    st.dataframe(fc_show, use_container_width=True, hide_index=True)
+    st.subheader(f"Jadual Unjuran Harga ({forecast_method})")
+    fc_out = fc_df.copy()
+    fc_out["Tarikh"] = fc_out["Tarikh"].dt.strftime("%Y-%m-%d")
+    fc_out["Ramalan (RM)"] = fc_out["Ramalan (RM)"].round(3)
+    st.dataframe(fc_out, use_container_width=True, hide_index=True)
